@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OttoBridge</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;800&display=swap');
+:root{--bg:#0a0a0b;--surf:#111113;--brd:#1e1e22;--brd2:#2a2a30;--txt:#e8e8ec;--muted:#5a5a6a;--acc:#f97316;--acc2:#fb923c;--grn:#22c55e;--yel:#eab308;--red:#ef4444;--blu:#3b82f6;--mono:'JetBrains Mono',monospace;--sans:'Syne',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:var(--mono);font-size:13px;min-height:100vh;overflow-x:hidden}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:50px;border-bottom:1px solid var(--brd);position:sticky;top:0;z-index:100;background:rgba(10,10,11,.96);backdrop-filter:blur(8px)}
+.logo{font-family:var(--sans);font-weight:800;font-size:17px;letter-spacing:-.4px;color:var(--acc)}.logo span{color:var(--txt)}
+.hdr-right{display:flex;align-items:center;gap:10px}
+.hdr-host{font-size:10px;color:var(--muted)}
+.pill{display:flex;align-items:center;gap:6px;padding:3px 10px;border:1px solid var(--brd2);border-radius:2px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--muted);transition:background .3s}
+.dot.online{background:var(--grn);box-shadow:0 0 5px var(--grn)}.dot.busy{background:var(--yel);box-shadow:0 0 5px var(--yel);animation:pulse 1.1s infinite}.dot.offline{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+nav{display:flex;border-bottom:1px solid var(--brd);padding:0 20px;overflow-x:auto}
+nav button{background:none;border:none;cursor:pointer;color:var(--muted);font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:10px 14px;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;white-space:nowrap}
+nav button:hover{color:var(--txt)}nav button.active{color:var(--acc);border-bottom-color:var(--acc)}
+main{max-width:1080px;margin:0 auto;padding:20px}
+.tab-pane{display:none}.tab-pane.active{display:block}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.card{background:var(--surf);border:1px solid var(--brd);border-radius:3px;padding:16px 18px}
+.card-title{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.stat-tile{background:var(--surf);border:1px solid var(--brd);border-radius:3px;padding:14px}
+.stat-label{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.stat-value{font-size:26px;font-weight:700;line-height:1}.stat-unit{font-size:11px;color:var(--muted);margin-left:2px}
+.progress-wrap{background:var(--brd);border-radius:2px;height:5px;overflow:hidden;margin:10px 0 5px}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:2px;transition:width .5s ease;width:0%}
+.progress-label{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
+.temp-row{display:flex;align-items:baseline;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--brd)}.temp-row:last-child{border:none}
+.temp-name{color:var(--muted);font-size:10px}.temp-val{font-size:20px;font-weight:600}.temp-target{font-size:10px;color:var(--muted);margin-left:5px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:7px 13px;border:1px solid var(--brd2);border-radius:2px;background:var(--surf);color:var(--txt);font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn:hover{border-color:var(--acc);color:var(--acc)}.btn:active{transform:scale(.97)}.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-acc{background:var(--acc);border-color:var(--acc);color:#000;font-weight:700}.btn-acc:hover{background:var(--acc2);border-color:var(--acc2);color:#000}
+.btn-danger{border-color:var(--red);color:var(--red)}.btn-danger:hover{background:var(--red);color:#fff}
+.btn-green{border-color:var(--grn);color:var(--grn)}.btn-green:hover{background:var(--grn);color:#000}
+.btn-yel{border-color:var(--yel);color:var(--yel)}.btn-yel:hover{background:var(--yel);color:#000}
+.btn-sm{padding:4px 9px;font-size:9px}
+.btn-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.field{margin-bottom:12px}.field label{display:block;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+input[type=text],input[type=password],input[type=number],select,textarea{width:100%;background:var(--bg);border:1px solid var(--brd2);border-radius:2px;color:var(--txt);font-family:var(--mono);font-size:12px;padding:7px 10px;outline:none;transition:border-color .15s}
+input:focus,select:focus{border-color:var(--acc)}select option{background:var(--surf)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--brd)}.toggle-row:last-child{border:none}
+.toggle-label{font-size:10px;color:var(--muted)}
+.toggle{position:relative;width:34px;height:18px}.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:var(--brd2);border-radius:9px;cursor:pointer;transition:.2s}
+.toggle-slider::before{content:'';position:absolute;left:3px;top:3px;width:12px;height:12px;background:var(--muted);border-radius:50%;transition:.2s}
+.toggle input:checked+.toggle-slider{background:var(--acc)}.toggle input:checked+.toggle-slider::before{transform:translateX(16px);background:#000}
+.sec-title{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;margin-top:20px;display:flex;align-items:center;gap:10px}
+.sec-title:first-child{margin-top:0}.sec-title::after{content:'';flex:1;border-top:1px solid var(--brd)}
+.badge{display:inline-block;padding:2px 7px;border-radius:2px;font-size:9px;letter-spacing:.07em;text-transform:uppercase;font-weight:600}
+.badge-running{background:#1f1800;color:var(--yel)}.badge-idle{background:#0f2015;color:var(--grn)}
+.badge-queued{background:#0e1620;color:var(--blu)}.badge-paused{background:#1a1510;color:#fb923c}
+.badge-error{background:#1f0f0f;color:var(--red)}.badge-offline{background:#1a1a1a;color:var(--muted)}
+.file-item{display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid var(--brd);border-radius:2px;margin-bottom:5px;background:var(--bg)}
+.file-name{flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file-size{font-size:9px;color:var(--muted);white-space:nowrap}
+.job-item{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--brd);border-radius:2px;margin-bottom:5px;background:var(--bg)}
+.jtag{font-size:9px;color:var(--muted);background:var(--surf);border:1px solid var(--brd2);border-radius:2px;padding:2px 6px;white-space:nowrap}
+.printer-card{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--brd);border-radius:3px;margin-bottom:8px;background:var(--bg);cursor:pointer;transition:border-color .15s}
+.printer-card:hover{border-color:var(--brd2)}.printer-card.selected{border-color:var(--acc)}
+.picon{width:34px;height:34px;border-radius:2px;background:var(--surf);display:flex;align-items:center;justify-content:center;font-size:16px;border:1px solid var(--brd);flex-shrink:0}
+.pname{font-size:12px;font-weight:600}.pmeta{font-size:10px;color:var(--muted);margin-top:1px}
+.pright{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.ams-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px}
+.tray{border:1px solid var(--brd2);border-radius:2px;padding:8px 6px;text-align:center;font-size:9px;color:var(--muted)}
+.tray-color{width:18px;height:18px;border-radius:50%;margin:0 auto 5px;border:1px solid rgba(255,255,255,.1)}
+.kv-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--brd);font-size:11px}.kv-row:last-child{border:none}
+.kv-key{color:var(--muted)}
+.eject-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.big-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:22px 12px;border:1px solid var(--brd2);border-radius:3px;background:var(--surf);cursor:pointer;transition:all .16s}
+.big-btn:hover{border-color:var(--acc);transform:translateY(-1px)}.big-btn:active{transform:scale(.97)}
+.big-btn-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.big-btn-sub{font-size:9px;color:#333;margin-top:2px;text-align:center}
+.door-btn{display:flex;align-items:center;gap:10px;padding:11px 16px;border:1px solid var(--brd2);border-radius:3px;background:var(--surf);cursor:pointer;transition:all .16s;width:100%;margin-bottom:12px}
+.door-btn:hover{border-color:#888;color:#aaa}
+.rack-wrap{background:var(--bg);border:1px solid var(--brd);border-radius:3px;padding:14px;margin-bottom:12px}
+.rack-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.rack-title{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.slot{display:grid;grid-template-columns:26px 1fr auto auto;align-items:center;gap:8px;padding:9px 10px;border:1px solid var(--brd);border-radius:2px;margin-bottom:6px;background:var(--surf);transition:border-color .15s}
+.slot.ready{border-color:#1a2e1a}.slot.empty{border-color:var(--brd)}
+.slot-num{font-size:11px;font-weight:700;color:#333;text-align:center}
+.slot-label{font-size:11px;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot-sub{font-size:9px;color:#3a3a3a;margin-top:1px}
+.slot-badge{padding:2px 7px;border-radius:2px;font-size:9px;letter-spacing:.07em;text-transform:uppercase;font-weight:600;white-space:nowrap}
+.sb-empty{background:#1a1a1e;color:#444}.sb-ready{background:#0a1a0a;color:var(--grn)}
+.slot-actions{display:flex;gap:5px}
+.drop-zone{border:2px dashed var(--brd2);border-radius:3px;padding:28px;text-align:center;cursor:pointer;transition:all .18s;color:var(--muted);font-size:11px}
+.drop-zone.drag{border-color:var(--acc);color:var(--acc);background:rgba(249,115,22,.04)}.drop-zone input{display:none}
+#gcode-log{background:var(--bg);border:1px solid var(--brd);border-radius:2px;padding:10px;height:160px;overflow-y:auto;font-size:10px;line-height:1.9;margin-bottom:8px}
+.log-sent{color:var(--acc)}.log-info{color:var(--muted)}.log-err{color:var(--red)}
+#toast-container{position:fixed;bottom:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:7px}
+.toast{background:var(--surf);border:1px solid var(--brd2);border-radius:2px;padding:9px 14px;font-size:11px;display:flex;align-items:center;gap:7px;max-width:280px;animation:slideIn .18s ease}
+.toast.ok{border-left:3px solid var(--grn)}.toast.err{border-left:3px solid var(--red)}.toast.info{border-left:3px solid var(--blu)}
+@keyframes slideIn{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+.divider{border:none;border-top:1px solid var(--brd);margin:16px 0}
+.error-banner{background:#1a0a0a;border:1px solid var(--red);border-radius:3px;padding:14px 16px;margin-top:14px}
+@media(max-width:640px){.g2,.g4{grid-template-columns:1fr 1fr}.eject-grid{grid-template-columns:1fr}}
+@media(max-width:400px){.g2{grid-template-columns:1fr}.slot{grid-template-columns:22px 1fr auto}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">OTTO<span>Bridge</span></div>
+  <div class="hdr-right">
+    <div class="hdr-host" id="hdr-host"></div>
+    <div class="pill"><div class="dot" id="conn-dot"></div><span id="conn-label">Verbinde…</span></div>
+  </div>
+</header>
+<nav>
+  <button class="active" onclick="switchTab('dashboard')">Dashboard</button>
+  <button onclick="switchTab('drucker')">Drucker</button>
+  <button onclick="switchTab('dateien')">Dateien</button>
+  <button onclick="switchTab('jobs')">Jobs</button>
+  <button onclick="switchTab('eject')">OttoEject</button>
+  <button onclick="switchTab('konsole')">Konsole</button>
+  <button onclick="switchTab('einstellungen')">Einstellungen</button>
+</nav>
+<main>
+
+<!-- DASHBOARD -->
+<div class="tab-pane active" id="tab-dashboard">
+  <div id="dash-empty" style="display:none;text-align:center;padding:48px 24px;color:var(--muted)">
+    <div style="font-size:32px;margin-bottom:12px">🖨</div>
+    <div style="font-size:14px;margin-bottom:8px;color:var(--txt)">Noch kein Drucker</div>
+    <button class="btn btn-acc" onclick="switchTab('einstellungen')">Drucker hinzufügen</button>
+  </div>
+  <div id="dash-content">
+    <div style="margin-bottom:14px">
+      <select id="dash-sel" onchange="selectDash(this.value)" style="background:var(--surf);border:1px solid var(--brd2);border-radius:2px;color:var(--txt);font-family:var(--mono);font-size:11px;padding:6px 10px;outline:none;width:100%;max-width:320px"></select>
+    </div>
+    <div class="g4" style="margin-bottom:14px">
+      <div class="stat-tile"><div class="stat-label">Status</div><div class="stat-value" id="s-state" style="font-size:16px">—</div></div>
+      <div class="stat-tile"><div class="stat-label">Düse</div><div class="stat-value" id="s-nozzle">—<span class="stat-unit">°C</span></div></div>
+      <div class="stat-tile"><div class="stat-label">Bett</div><div class="stat-value" id="s-bed">—<span class="stat-unit">°C</span></div></div>
+      <div class="stat-tile"><div class="stat-label">Fortschritt</div><div class="stat-value" id="s-pct">—<span class="stat-unit">%</span></div></div>
+    </div>
+    <div class="g2" style="margin-bottom:14px">
+      <div class="card">
+        <div class="card-title">Druckfortschritt</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="s-filename">—</div>
+        <div class="progress-wrap"><div class="progress-bar" id="s-bar"></div></div>
+        <div class="progress-label"><span id="s-layers">—</span><span id="s-remaining">—</span></div>
+        <div class="btn-row">
+          <button class="btn btn-green btn-sm" onclick="ctrl('resume')">▶ Fortsetzen</button>
+          <button class="btn btn-sm" onclick="ctrl('pause')">⏸ Pause</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmStop()">⏹ Stop</button>
+          <button class="btn btn-sm" onclick="ctrl('clear_error')">✕ Fehler</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Temperaturen</div>
+        <div class="temp-row"><span class="temp-name">Düse</span><span><span class="temp-val" id="t-nozzle">—</span><span class="temp-target" id="t-nozzle-tgt"></span></span></div>
+        <div class="temp-row"><span class="temp-name">Bett</span><span><span class="temp-val" id="t-bed">—</span><span class="temp-target" id="t-bed-tgt"></span></span></div>
+        <div class="btn-row">
+          <button class="btn btn-sm" onclick="quickGcodeD('M104 S0\nM140 S0')">❄ Abkühlen</button>
+          <button class="btn btn-sm" onclick="toast('info','Sync angefordert')">⟳ Sync</button>
+        </div>
+      </div>
+    </div>
+    <div class="card" id="ams-card" style="display:none;margin-bottom:14px">
+      <div class="card-title">AMS</div>
+      <div class="ams-grid" id="ams-trays"></div>
+    </div>
+    <div class="error-banner" id="error-card" style="display:none">
+      <div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);margin-bottom:6px">⚠ Druckfehler</div>
+      <div id="error-code" style="font-size:18px;font-weight:700;color:var(--red)"></div>
+      <div class="btn-row"><button class="btn btn-danger btn-sm" onclick="ctrl('clear_error')">Fehler bestätigen</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- DRUCKER -->
+<div class="tab-pane" id="tab-drucker">
+  <div class="sec-title">Verbundene Drucker</div>
+  <div id="printer-list"></div>
+  <button class="btn btn-acc" style="margin-top:14px" onclick="openAddForm()">+ Drucker hinzufügen</button>
+  <div id="pform" style="display:none;margin-top:20px">
+    <div class="sec-title" id="pform-title">Neuer Drucker</div>
+    <div class="card">
+      <input type="hidden" id="pf-id">
+      <div class="g2">
+        <div>
+          <div class="field"><label>Name</label><input type="text" id="pf-name" placeholder="Farm X1C #1"></div>
+          <div class="field"><label>Marke</label><select id="pf-brand" onchange="onBrand('pf')"></select></div>
+          <div class="field"><label>Modell</label><select id="pf-model"></select></div>
+          <div class="field"><label>IP-Adresse</label><input type="text" id="pf-ip" placeholder="192.168.1.100"></div>
+        </div>
+        <div>
+          <div class="field" id="pf-code-w"><label>Access Code <span style="color:var(--muted)">(Bambu)</span></label><input type="password" id="pf-code" placeholder="LAN code"></div>
+          <div class="field" id="pf-serial-w"><label>Seriennummer <span style="color:var(--muted)">(Bambu)</span></label><input type="text" id="pf-serial" placeholder="01S00A…"></div>
+          <div class="field" id="pf-apikey-w"><label>API Key <span style="color:var(--muted)">(Prusa)</span></label><input type="password" id="pf-apikey" placeholder="PrusaLink key"></div>
+          <div class="field" id="pf-sc-w"><label>Serial Code <span style="color:var(--muted)">(FlashForge)</span></label><input type="text" id="pf-sc" placeholder="FF serial"></div>
+          <div class="field" id="pf-cc-w"><label>Check Code <span style="color:var(--muted)">(FlashForge)</span></label><input type="password" id="pf-cc" placeholder="FF check"></div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-acc" onclick="savePrinter()">Speichern & Verbinden</button>
+        <button class="btn" onclick="closeForm()">Abbrechen</button>
+        <button class="btn btn-danger" id="pf-del" style="display:none" onclick="delPrinter()">Löschen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DATEIEN -->
+<div class="tab-pane" id="tab-dateien">
+  <div class="sec-title">Hochladen</div>
+  <div class="field" style="max-width:300px;margin-bottom:10px"><label>Auf Drucker übertragen</label><select id="upload-target"></select></div>
+  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <input type="file" id="file-input" accept=".3mf,.gcode" onchange="uploadFile(this.files[0])">
+    <div style="font-size:24px;margin-bottom:7px">↑</div>
+    <div>.3mf oder .gcode — wird direkt auf den Drucker übertragen</div>
+    <div style="margin-top:3px;font-size:9px;opacity:.5">Klicken oder ablegen</div>
+  </div>
+  <div id="upload-prog" style="display:none;margin-top:8px">
+    <div class="progress-wrap"><div class="progress-bar" style="width:100%;animation:pulse 1s infinite"></div></div>
+    <div style="font-size:10px;color:var(--muted);margin-top:4px" id="upload-lbl">Lade hoch…</div>
+  </div>
+  <hr class="divider">
+  <div class="sec-title">Gespeicherte Dateien</div>
+  <ul id="file-list" style="list-style:none"></ul>
+</div>
+
+<!-- JOBS -->
+<div class="tab-pane" id="tab-jobs">
+  <div class="sec-title">Neuer Job</div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="g2">
+      <div>
+        <div class="field"><label>Drucker</label><select id="job-printer"></select></div>
+        <div class="field"><label>Datei</label><select id="job-file"><option value="">— wählen —</option></select></div>
+        <div class="field"><label>Betttyp</label>
+          <select id="job-bed">
+            <option value="textured_plate">Textured Plate</option>
+            <option value="cool_plate">Cool Plate</option>
+            <option value="high_temp_plate">High Temp Plate</option>
+            <option value="engineering_plate">Engineering Plate</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="toggle-row"><span class="toggle-label">AMS verwenden</span><label class="toggle"><input type="checkbox" id="job-ams"><div class="toggle-slider"></div></label></div>
+        <div class="toggle-row"><span class="toggle-label">Bett-Nivellierung</span><label class="toggle"><input type="checkbox" id="job-level" checked><div class="toggle-slider"></div></label></div>
+        <div class="toggle-row"><span class="toggle-label">Flow-Kalibrierung</span><label class="toggle"><input type="checkbox" id="job-flow" checked><div class="toggle-slider"></div></label></div>
+        <div class="toggle-row"><span class="toggle-label">Vibrations-Kali.</span><label class="toggle"><input type="checkbox" id="job-vibr" checked><div class="toggle-slider"></div></label></div>
+        <div class="toggle-row"><span class="toggle-label">Lidar-Inspektion</span><label class="toggle"><input type="checkbox" id="job-lidar" checked><div class="toggle-slider"></div></label></div>
+        <div class="toggle-row"><span class="toggle-label">Timelapse</span><label class="toggle"><input type="checkbox" id="job-timelapse"><div class="toggle-slider"></div></label></div>
+      </div>
+    </div>
+    <div class="divider"></div>
+
+    <div class="sec-title" style="font-size:10px;margin-bottom:10px">Platte vor dem Druck</div>
+    <div class="toggle-row">
+      <span class="toggle-label">Platte liegt bereits im Drucker</span>
+      <label class="toggle"><input type="checkbox" id="job-plate-in-printer" checked onchange="onPlateModeChange()"><div class="toggle-slider"></div></label>
+    </div>
+    <div id="grab-slot-row" style="display:none;margin-top:10px">
+      <div class="field">
+        <label>Platte holen aus Slot</label>
+        <select id="job-grab-slot" onchange="onGrabSlotChange()" style="max-width:200px">
+          <option value="">— Slot wählen —</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="sec-title" style="font-size:10px;margin-top:14px;margin-bottom:10px">Platte nach dem Druck parken</div>
+    <div class="field">
+      <label>Platte parken in Slot</label>
+      <select id="job-park-slot" style="max-width:200px">
+        <option value="">— Slot wählen —</option>
+      </select>
+    </div>
+    <div id="job-slot-preview" style="display:none;margin-bottom:10px">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">Slots nach dem Queuen:</div>
+      <div style="display:flex;gap:5px;align-items:center" id="job-slot-preview-inner"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-acc" onclick="startNow()">▶ Jetzt drucken</button>
+      <button class="btn" onclick="addQueue()">+ Zur Warteschlange — Slots sperren</button>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-top:6px">Slots werden erst beim Queuen gesperrt.</div>
+  </div>
+  <div class="sec-title">Warteschlange</div>
+  <div id="job-list"></div>
+</div>
+
+<!-- OTTOEJECT -->
+<div class="tab-pane" id="tab-eject">
+  <div class="sec-title">Drucker auswählen</div>
+  <div class="field" style="max-width:380px;margin-bottom:14px">
+    <select id="eject-printer" onchange="onEjectPrinter()"></select>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="kv-row"><span class="kv-key">Drucker auswerfen</span><span id="ej-eject-macro" style="color:var(--acc);font-size:10px">—</span></div>
+    <div class="kv-row"><span class="kv-key">Drucker beladen</span><span id="ej-load-macro" style="color:var(--grn);font-size:10px">—</span></div>
+    <div class="kv-row"><span class="kv-key">Drucker Tür schliessen</span><span id="ej-door-macro" style="color:var(--muted);font-size:10px">—</span></div>
+  </div>
+
+  <div class="eject-grid">
+    <div class="big-btn" onclick="runEject()">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="1.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      <span class="big-btn-label">Drucker auswerfen</span>
+      <span class="big-btn-sub" id="ej-eject-lbl">—</span>
+    </div>
+    <div class="big-btn" onclick="runLoad()">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--grn)" stroke-width="1.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      <span class="big-btn-label">Drucker beladen</span>
+      <span class="big-btn-sub" id="ej-load-lbl">—</span>
+    </div>
+  </div>
+
+  <div class="door-btn" id="door-btn" onclick="runDoor()" style="opacity:.4;pointer-events:none">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="1"/><path d="M12 12h1"/></svg>
+    <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Drucker Tür schliessen</span>
+    <span id="ej-door-lbl" style="font-size:9px;color:#333;margin-left:auto">—</span>
+  </div>
+
+  <div class="divider"></div>
+  <div class="sec-title">Rack</div>
+
+  <div class="rack-wrap">
+    <div class="rack-header">
+      <span class="rack-title">Slots: <span id="rack-count">6</span></span>
+      <div style="display:flex;align-items:center;gap:7px">
+        <span style="font-size:9px;color:var(--muted)">Anzahl:</span>
+        <input type="number" id="slot-n" value="6" min="1" max="30" step="1"
+               style="width:54px;background:var(--bg);border:1px solid var(--brd2);border-radius:2px;color:var(--txt);font-family:var(--mono);font-size:11px;padding:4px 8px;outline:none">
+        <button class="btn btn-sm" onclick="setSlotCount()">OK</button>
+      </div>
+    </div>
+    <div id="rack-slots"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Benutzerdefiniertes Makro</div>
+    <div style="display:flex;gap:7px">
+      <input type="text" id="custom-macro" placeholder="MAKRO_NAME" style="flex:1">
+      <button class="btn btn-acc btn-sm" onclick="runCustom()">Ausführen</button>
+    </div>
+  </div>
+
+  <hr class="divider">
+  <div class="sec-title">Klipper / Moonraker Status</div>
+  <div class="card" id="klipper-status"><div style="color:var(--muted);font-size:11px">Lade…</div></div>
+</div>
+
+<!-- KONSOLE -->
+<div class="tab-pane" id="tab-konsole">
+  <div class="sec-title">G-Code Konsole</div>
+  <div class="field" style="max-width:300px;margin-bottom:10px"><label>Drucker</label><select id="console-printer"></select></div>
+  <div class="card">
+    <div id="gcode-log"></div>
+    <div style="display:flex;gap:7px">
+      <input type="text" id="gcode-input" placeholder="M117 Hallo" style="flex:1" onkeydown="if(event.key==='Enter')sendGcode()">
+      <button class="btn btn-acc" onclick="sendGcode()">Senden</button>
+    </div>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-sm" onclick="qg('M104 S0')">Düse aus</button>
+      <button class="btn btn-sm" onclick="qg('M140 S0')">Bett aus</button>
+      <button class="btn btn-sm" onclick="qg('G28')">Home</button>
+      <button class="btn btn-sm" onclick="qg('M84')">Motoren aus</button>
+      <button class="btn btn-sm" onclick="qg('M106 S255')">Fan max</button>
+      <button class="btn btn-sm" onclick="qg('M106 S0')">Fan aus</button>
+      <button class="btn btn-sm" onclick="qg('PARK_OTTOEJECT')">Park OttoEject</button>
+    </div>
+  </div>
+</div>
+
+<!-- EINSTELLUNGEN -->
+<div class="tab-pane" id="tab-einstellungen">
+  <div class="sec-title">Drucker hinzufügen</div>
+  <div class="card">
+    <div class="g2">
+      <div>
+        <div class="field"><label>Name</label><input type="text" id="cfg-name" placeholder="Farm X1C #1"></div>
+        <div class="field"><label>Marke</label><select id="cfg-brand" onchange="onBrand('cfg')"></select></div>
+        <div class="field"><label>Modell</label><select id="cfg-model"></select></div>
+        <div class="field"><label>IP-Adresse</label><input type="text" id="cfg-ip" placeholder="192.168.1.100"></div>
+      </div>
+      <div>
+        <div class="field"><label>Access Code <span style="color:var(--muted)">(Bambu)</span></label><input type="password" id="cfg-code" placeholder="LAN code"></div>
+        <div class="field"><label>Seriennummer <span style="color:var(--muted)">(Bambu)</span></label><input type="text" id="cfg-serial" placeholder="01S00A…"></div>
+        <div class="field"><label>API Key <span style="color:var(--muted)">(Prusa)</span></label><input type="password" id="cfg-apikey" placeholder="PrusaLink key"></div>
+        <div class="field"><label>Serial + Check Code <span style="color:var(--muted)">(FlashForge)</span></label>
+          <div style="display:flex;gap:7px"><input type="text" id="cfg-sc" placeholder="Serial"><input type="password" id="cfg-cc" placeholder="Check"></div>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row"><button class="btn btn-acc" onclick="addFromSettings()">Hinzufügen & Verbinden</button></div>
+  </div>
+  <hr class="divider">
+  <div class="sec-title">Mainsail-Integration</div>
+  <div class="card">
+    <div style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
+      OttoBridge als Tab in Mainsail einbinden — füge dies in <code style="background:var(--brd2);padding:1px 5px;border-radius:2px">moonraker.conf</code> ein:
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--brd2);border-radius:2px;padding:12px;font-family:var(--mono);font-size:11px;color:#808090;line-height:1.8" id="mainsail-snippet"></div>
+    <div class="btn-row"><button class="btn btn-sm" onclick="copySnippet()">Kopieren</button></div>
+    <div style="font-size:10px;color:var(--muted);margin-top:10px;line-height:1.7">
+      Mainsail hat kein natives Plugin-System — die empfohlene Methode ist ein <code style="background:var(--brd2);padding:1px 4px;border-radius:2px">[application]</code>-Eintrag in Moonraker, der OttoBridge als externen Link im Seitenmenü erscheinen lässt. OttoBridge läuft weiterhin eigenständig auf Port 8080.
+    </div>
+  </div>
+  <hr class="divider">
+  <div class="sec-title">Pi Zero 2 W — Ressourcen</div>
+  <div class="card">
+    <div class="kv-row"><span class="kv-key">Klipper</span><span style="color:var(--muted)">~40 MB RAM</span></div>
+    <div class="kv-row"><span class="kv-key">Moonraker</span><span style="color:var(--muted)">~60 MB RAM</span></div>
+    <div class="kv-row"><span class="kv-key">OttoBridge</span><span style="color:var(--grn)">~30 MB RAM</span></div>
+    <div class="kv-row"><span class="kv-key">Reserve</span><span style="color:var(--grn)">~380 MB ✓</span></div>
+    <div class="kv-row"><span class="kv-key">CPU-Last (idle)</span><span style="color:var(--muted)">&lt; 5 % pro Drucker</span></div>
+  </div>
+</div>
+
+</main>
+<div id="toast-container"></div>
+
+<script>
+const S={};let dashPid=null,brands={},ws,wsT,rackState={num_slots:6,slots:[]};
+const TAB_NAMES=['dashboard','drucker','dateien','jobs','eject','konsole','einstellungen'];
+
+(async()=>{
+  document.getElementById('hdr-host').textContent=location.host;
+  updateSnippet();
+  brands=await api('GET','/api/brands')||{};
+  populateBrandSelects();
+  const init=await api('GET','/api/printers')||[];
+  init.forEach(p=>S[p.id]=p);
+  const rc=await api('GET','/api/rack');
+  if(rc)rackState=rc;
+  renderAll();renderRack();
+  if(!dashPid&&init.length)selectDash(init[0].id);
+  connectWS();
+})();
+
+function connectWS(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen=()=>clearTimeout(wsT);
+  ws.onmessage=e=>{
+    try{
+      const msg=JSON.parse(e.data);
+      if(msg.event==='init'){
+        (msg.data.printers||[]).forEach(p=>S[p.id]=p);
+        if(msg.data.rack)rackState=msg.data.rack;
+        renderAll();renderRack();
+        if(!dashPid&&Object.keys(S).length)selectDash(Object.values(S)[0].id);
+      }else if(msg.event==='state'){
+        S[msg.data.id]=msg.data;
+        renderAll();
+        if(msg.data.id===dashPid)renderDash();
+      }else if(msg.event==='rack'){
+        rackState=msg.data;renderRack();
+      }else if(msg.event==='job_added'){
+        renderJobs();
+      }
+    }catch{}
+  };
+  ws.onclose=()=>{setDot(false,'Getrennt');wsT=setTimeout(connectWS,3000);};
+}
+
+function populateBrandSelects(){
+  ['pf-brand','cfg-brand'].forEach(id=>{
+    const s=document.getElementById(id);if(!s)return;
+    s.innerHTML='<option value="">— Marke wählen —</option>';
+    for(const[k,v]of Object.entries(brands)){
+      s.innerHTML+=`<option value="${k}">${v.label}</option>`;
+    }
+  });
+}
+
+function fillModels(prefix){
+  const brand=document.getElementById(`${prefix}-brand`).value;
+  const sel=document.getElementById(`${prefix}-model`);
+  const binfo=brands[brand]||{};
+  sel.innerHTML=(binfo.models||[]).map(m=>`<option value="${m}">${m}</option>`).join('');
+}
+
+function onBrand(prefix){
+  fillModels(prefix);
+  if(prefix==='pf')updateAuthFields();
+}
+
+function updateAuthFields(){
+  const brand=document.getElementById('pf-brand').value;
+  const binfo=brands[brand]||{};
+  const f=binfo.auth_fields||[];
+  const show=(id,field)=>{const w=document.getElementById(id);if(w)w.style.display=f.includes(field)?'block':'none';};
+  show('pf-code-w','access_code');show('pf-serial-w','serial');
+  show('pf-apikey-w','api_key');show('pf-sc-w','serial_code');show('pf-cc-w','check_code');
+}
+
+function renderAll(){
+  const plist=Object.values(S);
+  const empty=!plist.length;
+  document.getElementById('dash-empty').style.display=empty?'block':'none';
+  document.getElementById('dash-content').style.display=empty?'none':'block';
+
+  const pl=document.getElementById('printer-list');
+  pl.innerHTML=plist.length
+    ?plist.map(p=>`<div class="printer-card" onclick="editPrinter('${p.id}')">
+        <div class="picon">🖨</div>
+        <div><div class="pname">${esc(p.name)}</div><div class="pmeta">${esc(brands[p.brand]?.label||p.brand)} ${esc(p.model)} · ${esc(p.ip)}</div></div>
+        <div class="pright">
+          <span class="badge badge-${bc(p.status)}">${esc(p.status||'—')}</span>
+          ${p.progress!=null?`<span style="font-size:9px;color:var(--muted)">${Math.round(p.progress)}%</span>`:''}
+        </div>
+      </div>`).join('')
+    :'<div style="color:var(--muted);font-size:11px;padding:12px">Noch keine Drucker.</div>';
+
+  updateSelects(plist);
+}
+
+function updateSelects(plist){
+  ['dash-sel','job-printer','eject-printer','console-printer','upload-target'].forEach(id=>{
+    const s=document.getElementById(id);if(!s)return;
+    const cur=s.value;
+    s.innerHTML=plist.map(p=>`<option value="${p.id}">${esc(p.name)} (${esc(p.model||p.brand||'')})</option>`).join('');
+    if(cur&&plist.find(p=>p.id===cur))s.value=cur;
+  });
+  onEjectPrinter();
+}
+
+function selectDash(pid){
+  dashPid=pid;
+  const s=document.getElementById('dash-sel');if(s)s.value=pid;
+  renderDash();
+}
+
+function renderDash(){
+  const p=S[dashPid];if(!p)return;
+  setDot(p.connected,p.connected?p.status:'Offline');
+  setText('s-state',p.status);
+  const se=document.getElementById('s-state');
+  if(se)se.style.color={RUNNING:'var(--yel)',FINISH:'var(--grn)',FAILED:'var(--red)'}[p.status]||'var(--txt)';
+  setText('s-nozzle',fmt1(p.nozzle_temp));setText('s-bed',fmt1(p.bed_temp));
+  setText('s-pct',p.progress!=null?Math.round(p.progress):'—');
+  setText('t-nozzle',fmt1(p.nozzle_temp));setText('t-bed',fmt1(p.bed_temp));
+  setText('t-nozzle-tgt',p.nozzle_target!=null?`→ ${fmt1(p.nozzle_target)}°`:'');
+  setText('t-bed-tgt',p.bed_target!=null?`→ ${fmt1(p.bed_target)}°`:'');
+  const pct=p.progress!=null?Math.min(100,Math.max(0,p.progress)):0;
+  document.getElementById('s-bar').style.width=pct+'%';
+  setText('s-filename',p.filename||'Kein aktiver Druck');
+  setText('s-layers',(p.layer_num!=null&&p.total_layer_num!=null)?`Schicht ${p.layer_num} / ${p.total_layer_num}`:'—');
+  setText('s-remaining',p.remaining_min!=null?`${p.remaining_min} min`:'—');
+  const ec=document.getElementById('error-card');
+  if(p.print_error&&p.print_error!=='0'){ec.style.display='block';setText('error-code',`Fehlercode: ${p.print_error}`);}
+  else ec.style.display='none';
+  const ams=p.ams;
+  const ac=document.getElementById('ams-card');
+  if(ams&&ams.ams&&ams.ams.length){
+    ac.style.display='block';
+    document.getElementById('ams-trays').innerHTML=ams.ams.flatMap(u=>(u.tray||[]).map(t=>{
+      const col=t.tray_color?'#'+t.tray_color.slice(0,6):'#333';
+      return `<div class="tray"><div class="tray-color" style="background:${col}"></div><div>${esc(t.tray_type||'—')}</div><div>${t.remain!=null?t.remain+'%':''}</div></div>`;
+    })).join('');
+  }else ac.style.display='none';
+}
+
+function setDot(on,lbl){
+  const d=document.getElementById('conn-dot'),l=document.getElementById('conn-label');
+  d.className='dot';
+  if(on===null)d.classList.add('online');
+  else if(on){const busy=['RUNNING','PAUSED','PREPARE'].includes(lbl);d.classList.add(busy?'busy':'online');}
+  else d.classList.add('offline');
+  l.textContent=lbl;
+}
+
+async function ctrl(action){
+  if(!dashPid)return;
+  const ep=action==='clear_error'?'clear_error':action;
+  await api('POST',`/api/print/${ep}`,{printer_id:dashPid});
+}
+async function quickGcodeD(cmd){if(!dashPid)return;await api('POST','/api/gcode',{printer_id:dashPid,command:cmd});}
+function confirmStop(){if(confirm('Druck wirklich abbrechen?'))ctrl('stop');}
+
+// PRINTER CRUD
+function openAddForm(){
+  document.getElementById('pf-id').value='';
+  ['pf-name','pf-ip','pf-code','pf-serial','pf-apikey','pf-sc','pf-cc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pf-brand').value='';
+  document.getElementById('pf-model').innerHTML='<option>—</option>';
+  document.getElementById('pf-del').style.display='none';
+  document.getElementById('pform-title').textContent='Neuer Drucker';
+  document.getElementById('pform').style.display='block';
+  updateAuthFields();
+}
+
+function editPrinter(pid){
+  const p=S[pid];if(!p)return;
+  document.getElementById('pf-id').value=pid;
+  document.getElementById('pf-name').value=p.name||'';
+  document.getElementById('pf-brand').value=p.brand||'';
+  fillModels('pf');
+  document.getElementById('pf-model').value=p.model||'';
+  document.getElementById('pf-ip').value=p.ip||'';
+  document.getElementById('pf-serial').value=p.serial||'';
+  document.getElementById('pf-sc').value=p.serial_code||'';
+  ['pf-code','pf-apikey','pf-cc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pf-del').style.display='inline-flex';
+  document.getElementById('pform-title').textContent='Drucker bearbeiten';
+  document.getElementById('pform').style.display='block';
+  updateAuthFields();
+  switchTab('drucker');
+}
+
+async function savePrinter(){
+  const pid=document.getElementById('pf-id').value;
+  const body={id:pid||undefined,name:v('pf-name'),brand:v('pf-brand'),model:v('pf-model'),
+    ip:v('pf-ip'),access_code:v('pf-code'),serial:v('pf-serial'),
+    api_key:v('pf-apikey'),serial_code:v('pf-sc'),check_code:v('pf-cc')};
+  if(!body.name||!body.brand||!body.ip){toast('err','Name, Marke und IP erforderlich');return;}
+  const r=await api(pid?'PUT':'POST',pid?`/api/printers/${pid}`:'/api/printers',body);
+  if(r){S[r.id]=r;renderAll();closeForm();toast('ok',`${r.name} gespeichert ✓`);if(!dashPid)selectDash(r.id);}
+}
+
+async function delPrinter(){
+  const pid=document.getElementById('pf-id').value;
+  if(!pid||!confirm('Drucker wirklich entfernen?'))return;
+  await api('DELETE',`/api/printers/${pid}`);
+  delete S[pid];if(dashPid===pid)dashPid=null;
+  renderAll();closeForm();toast('ok','Drucker entfernt');
+}
+
+function closeForm(){document.getElementById('pform').style.display='none';}
+
+async function addFromSettings(){
+  const body={name:v('cfg-name'),brand:v('cfg-brand'),model:v('cfg-model'),ip:v('cfg-ip'),
+    access_code:v('cfg-code'),serial:v('cfg-serial'),api_key:v('cfg-apikey'),
+    serial_code:v('cfg-sc'),check_code:v('cfg-cc')};
+  if(!body.name||!body.brand||!body.ip){toast('err','Name, Marke und IP erforderlich');return;}
+  const r=await api('POST','/api/printers',body);
+  if(r){S[r.id]=r;renderAll();toast('ok',`${r.name} hinzugefügt ✓`);if(!dashPid)selectDash(r.id);}
+}
+
+// FILES
+async function uploadFile(file){
+  if(!file)return;
+  const pid=document.getElementById('upload-target').value;
+  if(!pid){toast('err','Bitte Drucker wählen');return;}
+  document.getElementById('upload-prog').style.display='block';
+  document.getElementById('upload-lbl').textContent=`Lade hoch: ${file.name}…`;
+  const fd=new FormData();fd.append('file',file);
+  try{
+    const r=await fetch(`/api/upload/${pid}`,{method:'POST',body:fd});
+    const d=await r.json();
+    if(d.ok){toast('ok',`${file.name} hochgeladen ✓`);loadFiles();}
+    else toast('err',d.detail||'Upload fehlgeschlagen');
+  }catch(e){toast('err',e.message);}
+  finally{document.getElementById('upload-prog').style.display='none';document.getElementById('file-input').value='';}
+}
+
+async function loadFiles(){
+  const files=await api('GET','/api/files')||[];
+  const ul=document.getElementById('file-list');
+  const sel=document.getElementById('job-file');
+  ul.innerHTML='';
+  sel.innerHTML='<option value="">— Datei wählen —</option>';
+  for(const f of files){
+    const li=document.createElement('li');li.className='file-item';
+    li.innerHTML=`<span class="file-name">${esc(f.name)}</span><span class="file-size">${fmtSz(f.size)}</span>
+      <div style="display:flex;gap:5px">
+        <button class="btn btn-acc btn-sm" onclick="quickPrint('${esc(f.name)}')">▶</button>
+        <button class="btn btn-danger btn-sm" onclick="delFile('${esc(f.name)}')">✕</button>
+      </div>`;
+    ul.appendChild(li);
+    sel.innerHTML+=`<option value="${esc(f.name)}">${esc(f.name)}</option>`;
+  }
+}
+
+async function delFile(name){await api('DELETE',`/api/files/${encodeURIComponent(name)}`);toast('ok',`${name} gelöscht`);loadFiles();}
+function quickPrint(fn){switchTab('jobs');document.getElementById('job-file').value=fn;}
+
+// JOBS — Rack slot state cache
+let rackSlots=[];
+
+async function syncRack(){
+  const r=await api('GET','/api/rack');
+  if(r){rackSlots=r.slots||[];}
+}
+
+function buildJobSlotSelects(){
+  const grabSel=document.getElementById('job-grab-slot');
+  const parkSel=document.getElementById('job-park-slot');
+  if(!grabSel||!parkSel)return;
+  const plateInPrinter=document.getElementById('job-plate-in-printer').checked;
+  const curGrab=grabSel.value, curPark=parkSel.value;
+
+  // Grab: only 'ready' slots
+  grabSel.innerHTML='<option value="">— Slot wählen —</option>';
+  for(let i=0;i<rackSlots.length;i++){
+    if(rackSlots[i].state==='ready')
+      grabSel.innerHTML+=`<option value="${i+1}">Slot ${i+1}</option>`;
+  }
+  if(curGrab)grabSel.value=curGrab;
+
+  // Park: 'empty' slots PLUS the grab slot (freed immediately after grab)
+  const grabN=plateInPrinter?null:(+grabSel.value||null);
+  parkSel.innerHTML='<option value="">— Slot wählen —</option>';
+  for(let i=0;i<rackSlots.length;i++){
+    const n=i+1, s=rackSlots[i];
+    // Available if: empty, OR it's the grab slot (will be free after plate is taken)
+    if(s.state==='empty'||n===grabN){
+      const lbl=n===grabN?`Slot ${n} ← selber Slot (nach Grab frei)`:`Slot ${n}`;
+      parkSel.innerHTML+=`<option value="${n}">${lbl}</option>`;
+    }
+  }
+  // Auto-suggest same slot when grab is set
+  if(curPark)parkSel.value=curPark;
+  else if(grabN)parkSel.value=grabN;
+
+  updateJobSlotPreview();
+}
+
+function onPlateModeChange(){
+  const plateInPrinter=document.getElementById('job-plate-in-printer').checked;
+  document.getElementById('grab-slot-row').style.display=plateInPrinter?'none':'block';
+  buildJobSlotSelects();
+}
+
+function onGrabSlotChange(){
+  // Rebuild park options whenever grab changes — grab slot becomes park-eligible
+  buildJobSlotSelects();
+}
+
+function updateJobSlotPreview(){
+  const wrap=document.getElementById('job-slot-preview');
+  const inner=document.getElementById('job-slot-preview-inner');
+  if(!wrap||!inner)return;
+  const plateInPrinter=document.getElementById('job-plate-in-printer').checked;
+  const grabN=plateInPrinter?null:(+document.getElementById('job-grab-slot')?.value||null);
+  const parkN=+document.getElementById('job-park-slot')?.value||null;
+  if(!parkN){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  const sameSlot=grabN&&parkN&&grabN===parkN;
+  inner.innerHTML=rackSlots.map((s,i)=>{
+    const n=i+1,isGrab=grabN===n,isPark=parkN===n,isSame=isGrab&&isPark;
+    let bg='#111113',brd='#222',col='#333';
+    if(isSame)  {bg='rgba(249,115,22,.12)';brd='#f97316';col='#f97316';}
+    else if(isGrab){bg='rgba(59,130,246,.1)'; brd='#3b82f6';col='#3b82f6';}
+    else if(isPark){bg='rgba(249,115,22,.1)'; brd='#f97316';col='#f97316';}
+    else if(s.state==='ready'){bg='#0d160d';brd='#22c55e';col='#22c55e';}
+    return`<div style="width:22px;height:22px;border-radius:2px;border:1px solid ${brd};background:${bg};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${col};font-family:var(--mono)">${n}</div>`;
+  }).join('')+`<span style="font-size:10px;color:var(--muted);margin-left:8px">${
+    sameSlot?`Slot ${grabN}: holen → drucken → wieder einlagern`
+    :`${grabN?`Slot ${grabN} holen → `:''}Slot ${parkN} parken`
+  }</span>`;
+}
+
+function buildJob(){
+  const pid=v('job-printer'),fn=v('job-file');
+  if(!pid){toast('err','Bitte Drucker wählen');return null;}
+  if(!fn) {toast('err','Bitte Datei wählen');return null;}
+  const plateInPrinter=document.getElementById('job-plate-in-printer').checked;
+  const grabN=plateInPrinter?null:(+document.getElementById('job-grab-slot')?.value||null);
+  const parkN=+document.getElementById('job-park-slot')?.value||null;
+  if(!plateInPrinter&&!grabN){toast('err','Bitte Grab-Slot wählen');return null;}
+  if(!parkN){toast('err','Bitte Park-Slot wählen');return null;}
+  if(grabN&&rackSlots[grabN-1]?.state!=='ready'){toast('err',`Slot ${grabN} hat keine Platte`);return null;}
+  const ps=rackSlots[parkN-1];
+  if(ps&&ps.state!=='empty'&&parkN!==grabN){toast('err',`Slot ${parkN} ist nicht frei`);return null;}
+  return{printer_id:pid,filename:fn,bed_type:v('job-bed'),
+    use_ams:document.getElementById('job-ams').checked,
+    bed_level:document.getElementById('job-level').checked,
+    flow_cali:document.getElementById('job-flow').checked,
+    vibr_cali:document.getElementById('job-vibr').checked,
+    layer_inspect:document.getElementById('job-lidar').checked,
+    timelapse:document.getElementById('job-timelapse').checked,
+    grab_slot:grabN, park_slot:parkN};
+}
+
+async function lockSlots(grabN,parkN){
+  if(grabN) await api('PUT','/api/rack/slot',{slot_index:grabN-1,state:'grab_reserved',label:'Wird geholt'});
+  // If same slot: grab frees it first, then park_reserved takes it — backend handles this
+  await api('PUT','/api/rack/slot',{slot_index:parkN-1,state:'park_reserved',label:'Park-Slot'});
+  await syncRack();buildJobSlotSelects();
+}
+
+async function startNow(){
+  await syncRack();
+  const r=buildJob();if(!r)return;
+  const ok=await api('POST','/api/print/start',r);
+  if(ok){await lockSlots(r.grab_slot,r.park_slot);toast('ok',`Druck gestartet: ${r.filename}`);}
+}
+
+async function addQueue(){
+  await syncRack();
+  const r=buildJob();if(!r)return;
+  const job=await api('POST','/api/jobs',r);
+  if(job){
+    await lockSlots(r.grab_slot,r.park_slot);
+    toast('info',`${r.filename} in Warteschlange — Slots gesperrt`);
+    renderJobs();
+  }
+}
+
+async function renderJobs(){
+  const jobs=await api('GET','/api/jobs')||[];
+  const el=document.getElementById('job-list');
+  el.innerHTML=jobs.length
+    ?jobs.map(j=>{
+      const p=S[j.printer_id];
+      const grabLbl=j.grab_slot?`Slot ${j.grab_slot}`:'Im Drucker';
+      const parkLbl=j.park_slot?`Slot ${j.park_slot}`:'—';
+      const same=j.grab_slot&&j.park_slot&&j.grab_slot===j.park_slot;
+      return`<div class="job-item">
+        <span class="jtag">${esc(p?p.name:j.printer_id)}</span>
+        <span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(j.filename)}</span>
+        <span style="font-size:9px;color:var(--muted)">
+          <span style="color:#3b82f6">⬆ ${grabLbl}</span> →
+          <span style="color:#eab308">⬇ ${parkLbl}</span>
+          ${same?'<span style="color:#f97316;font-size:8px"> ↺</span>':''}
+        </span>
+        <span class="badge badge-${bc(j.status)}">${esc(j.status)}</span>
+        <button class="btn btn-danger btn-sm" onclick="delJob('${j.id}')">✕</button>
+      </div>`;}).join('')
+    :'<div style="color:var(--muted);font-size:11px;padding:10px">Warteschlange leer.</div>';
+}
+
+async function delJob(id){await api('DELETE',`/api/jobs/${id}`);renderJobs();}
+
+// OTTOEJECT
+function onEjectPrinter(){
+  const pid=document.getElementById('eject-printer')?.value;
+  const p=pid?S[pid]:null;const m=p?.macros||{};
+  setText('ej-eject-macro',m.eject||'—');setText('ej-eject-lbl',m.eject||'—');
+  setText('ej-load-macro',m.load||'—');setText('ej-load-lbl',m.load||'—');
+  setText('ej-door-macro',m.close_door||'nicht verfügbar');setText('ej-door-lbl',m.close_door||'—');
+  const db=document.getElementById('door-btn');
+  db.style.opacity=m.close_door?'1':'0.4';
+  db.style.pointerEvents=m.close_door?'auto':'none';
+}
+
+async function runEject(){
+  const pid=document.getElementById('eject-printer').value;if(!pid){toast('err','Bitte Drucker wählen');return;}
+  const r=await api('POST',`/api/ottoeject/eject/${pid}`);
+  if(r?.ok)toast('ok',`✓ ${r.macro}`);
+}
+async function runLoad(){
+  const pid=document.getElementById('eject-printer').value;if(!pid){toast('err','Bitte Drucker wählen');return;}
+  const r=await api('POST',`/api/ottoeject/load/${pid}`);
+  if(r?.ok)toast('ok',`✓ ${r.macro}`);
+}
+async function runDoor(){
+  const pid=document.getElementById('eject-printer').value;if(!pid)return;
+  const r=await api('POST',`/api/ottoeject/close_door/${pid}`);
+  if(r?.ok)toast('ok',`✓ ${r.macro}`);
+}
+async function runCustom(){
+  const m=document.getElementById('custom-macro').value.trim();if(!m)return;
+  const r=await api('POST','/api/ottoeject/macro',{macro:m});
+  if(r?.ok)toast('ok',`✓ ${m}`);
+}
+
+// RACK
+function renderRack(){
+  const el=document.getElementById('rack-slots');if(!el)return;
+  const n=rackState.num_slots||6;
+  document.getElementById('rack-count').textContent=n;
+  document.getElementById('slot-n').value=n;
+  el.innerHTML='';
+  for(let i=0;i<n;i++){
+    const s=rackState.slots[i]||{state:'empty',label:'',note:''};
+    const ready=s.state==='ready';
+    const div=document.createElement('div');
+    div.className=`slot ${s.state}`;
+    div.innerHTML=`
+      <div class="slot-num">${i+1}</div>
+      <div>
+        <div class="slot-label">${esc(s.label||(ready?'Platte drin':'Leer'))}</div>
+        <div class="slot-sub">${ready?`GRAB_FROM_SLOT_${i+1}`:`STORE_TO_SLOT_${i+1}`}</div>
+      </div>
+      <span class="slot-badge ${ready?'sb-ready':'sb-empty'}">${ready?'Bereit':'Leer'}</span>
+      <div class="slot-actions">
+        ${ready
+          ?`<button class="btn btn-yel btn-sm" onclick="grabSlot(${i+1})">← Entnehmen</button>
+            <button class="btn btn-acc btn-sm" onclick="grabAndEject(${i+1})">→ Drucker</button>`
+          :`<button class="btn btn-green btn-sm" onclick="storeSlot(${i+1})">+ Einlagern</button>`
+        }
+      </div>`;
+    el.appendChild(div);
+  }
+}
+
+async function setSlotCount(){
+  const n=parseInt(document.getElementById('slot-n').value)||6;
+  const r=await api('PUT','/api/rack/config',{num_slots:n});
+  if(r){rackState=r;renderRack();}
+}
+
+async function storeSlot(slot){
+  const r=await api('POST',`/api/ottoeject/store_slot/${slot}`);
+  if(r?.ok)toast('ok',`STORE_TO_SLOT_${slot} ✓`);
+  else toast('err',`STORE_TO_SLOT_${slot} fehlgeschlagen`);
+}
+
+async function grabSlot(slot){
+  const r=await api('POST',`/api/ottoeject/grab_slot/${slot}`);
+  if(r?.ok)toast('ok',`GRAB_FROM_SLOT_${slot} ✓`);
+  else toast('err',`GRAB_FROM_SLOT_${slot} fehlgeschlagen`);
+}
+
+async function grabAndEject(slot){
+  const pid=document.getElementById('eject-printer').value;
+  if(!pid){toast('err','Bitte Drucker im Eject-Tab wählen');return;}
+  const r1=await api('POST',`/api/ottoeject/grab_slot/${slot}`);
+  if(!r1?.ok){toast('err',`GRAB_FROM_SLOT_${slot} fehlgeschlagen`);return;}
+  toast('info',`Platte aus Slot ${slot} entnommen — lade auf Drucker…`);
+  const r2=await api('POST',`/api/ottoeject/load/${pid}`);
+  if(r2?.ok)toast('ok',`Platte auf Drucker geladen ✓`);
+}
+
+async function loadKlipper(){
+  const d=await api('GET','/api/ottoeject/status');
+  const el=document.getElementById('klipper-status');
+  if(d?.result){
+    const r=d.result;
+    el.innerHTML=`<div class="kv-row"><span class="kv-key">Status</span><span>${esc(r.state||'—')}</span></div>
+      <div class="kv-row"><span class="kv-key">Hostname</span><span>${esc(r.hostname||'—')}</span></div>
+      <div class="kv-row"><span class="kv-key">Klipper</span><span>${esc(r.software_version||'—')}</span></div>`;
+  }else{el.innerHTML='<div style="color:var(--red);font-size:11px">Moonraker nicht erreichbar</div>';}
+}
+
+// GCODE CONSOLE
+async function sendGcode(){
+  const inp=document.getElementById('gcode-input');
+  const pid=document.getElementById('console-printer').value;
+  const cmd=inp.value.trim();if(!cmd||!pid)return;
+  logG(cmd,'sent');await api('POST','/api/gcode',{printer_id:pid,command:cmd});inp.value='';
+}
+async function qg(cmd){
+  const pid=document.getElementById('console-printer').value;
+  if(!pid){toast('err','Bitte Drucker wählen');return;}
+  logG(cmd,'sent');await api('POST','/api/gcode',{printer_id:pid,command:cmd});
+}
+function logG(line,type){
+  const log=document.getElementById('gcode-log');
+  const d=document.createElement('div');
+  d.className=type==='sent'?'log-sent':type==='err'?'log-err':'log-info';
+  d.textContent=`${new Date().toLocaleTimeString()} ${type==='sent'?'→':'←'} ${line}`;
+  log.appendChild(d);log.scrollTop=log.scrollHeight;
+}
+
+// MAINSAIL SNIPPET
+function updateSnippet(){
+  const port=location.port||'8080';
+  document.getElementById('mainsail-snippet').textContent=
+    `[application OttoBridge]\ntype: adhoc\nwebsite: http://localhost:${port}`;
+}
+async function copySnippet(){
+  await navigator.clipboard.writeText(document.getElementById('mainsail-snippet').textContent).catch(()=>{});
+  toast('ok','Kopiert');
+}
+
+// UTILS
+async function api(method,path,body){
+  try{
+    const r=await fetch(path,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
+    if(!r.ok){const e=await r.json().catch(()=>({detail:r.statusText}));toast('err',e.detail||`Fehler ${r.status}`);return null;}
+    return await r.json();
+  }catch(e){toast('err',e.message);return null;}
+}
+function setText(id,val){const e=document.getElementById(id);if(e)e.textContent=val??'—';}
+function v(id){return document.getElementById(id)?.value?.trim()||'';}
+function fmt1(x){return x!=null?parseFloat(x).toFixed(1):'—';}
+function fmtSz(b){if(b<1024)return b+' B';if(b<1<<20)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB';}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function bc(st){return{RUNNING:'running',IDLE:'idle',PAUSED:'paused',FINISH:'idle',FAILED:'error',OFFLINE:'offline',queued:'queued'}[st]||'offline';}
+function toast(type,msg){
+  const c=document.getElementById('toast-container');
+  const t=document.createElement('div');t.className=`toast ${type}`;t.textContent=msg;c.appendChild(t);
+  setTimeout(()=>t.remove(),4000);
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  const idx=TAB_NAMES.indexOf(name);
+  if(idx>=0)document.querySelectorAll('nav button')[idx].classList.add('active');
+  if(name==='dateien')loadFiles();
+  if(name==='jobs'){loadFiles();renderJobs();syncRack().then(buildJobSlotSelects);}
+  if(name==='eject'){onEjectPrinter();renderRack();loadKlipper();}
+  if(name==='einstellungen')updateSnippet();
+}
+
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)uploadFile(f);});
+
+setInterval(async()=>{
+  if(ws?.readyState!==WebSocket.OPEN){
+    const list=await api('GET','/api/printers');
+    if(list){list.forEach(p=>S[p.id]=p);renderAll();if(dashPid)renderDash();}
+  }
+},6000);
+</script>
+</body>
+</html>
