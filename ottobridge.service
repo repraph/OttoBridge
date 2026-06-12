@@ -1,0 +1,16 @@
+[Unit]
+Description=OttoBridge v2 – Multi-Printer + OttoEject Web Interface
+After=network.target moonraker.service
+Wants=moonraker.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/ottobridge
+ExecStart=/home/pi/ottobridge/venv/bin/uvicorn app:app --host 0.0.0.0 --port 8080 --workers 1
+Restart=on-failure
+RestartSec=5
+Environment=MOONRAKER_URL=http://localhost:7125
+
+[Install]
+WantedBy=multi-user.target
