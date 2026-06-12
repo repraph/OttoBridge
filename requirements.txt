@@ -1,0 +1,7 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+aiomqtt==2.3.0
+aiofiles==24.1.0
+httpx==0.28.0
+python-multipart==0.0.12
+pydantic==2.10.3
