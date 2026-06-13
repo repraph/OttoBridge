@@ -4,6 +4,8 @@
 
 Runs on a Raspberry Pi Zero 2 W alongside Klipper + Moonraker. Replaces OTTOengine with a lean Python/FastAPI backend (~30 MB RAM) and a vanilla JS frontend — no Electron, no Node.js, no build step.
 
+📖 **New to OttoBridge? Start here → [INSTALL.md](INSTALL.md)**
+
 ![OttoBridge Dashboard](https://raw.githubusercontent.com/repraph/OttoBridge/main/docs/screenshot.png)
 
 ---
@@ -15,7 +17,7 @@ Runs on a Raspberry Pi Zero 2 W alongside Klipper + Moonraker. Replaces OTTOengi
 | Bambu Lab | X1C, P1S, P1P, A1, A1 Mini, P2S | MQTT + FTPS |
 | Prusa | MK3S, MK3, MK4S, MK4, Core One | PrusaLink HTTP |
 | Creality | K1C, K1, K1 Max | HTTP |
-| Anycubic | Kobra S1, Kobra S1 Max | Moonraker |
+| Anycubic | Kobra S1 | Moonraker |
 | Elegoo | Centauri Carbon, Centauri | WebSocket |
 | FlashForge | AD5X, Adventurer 5M Pro, 5M | HTTP |
 | Generic | Any Klipper/Moonraker printer | Moonraker |
@@ -78,29 +80,24 @@ venv/bin/uvicorn app:app --host 0.0.0.0 --port 8080 --workers 1
 
 ## Klipper Macros Setup
 
-Copy the macro files to your Klipper config directory:
+OttoBridge verwendet die Makros direkt aus den OttoEject-Konfigurationsdateien — es werden keine zusätzlichen Makros benötigt. `GRAB_FROM_SLOT_N` und `STORE_TO_SLOT_N` sind bereits in `storage_calibration_variables.cfg` definiert.
 
-```bash
-cp klipper_macros/rack_slots.cfg ~/printer_data/config/macros/
-```
-
-Add to your `printer.cfg`:
+Die Konfigurationsdateien liegen direkt im Klipper-Config-Verzeichnis (z.B. `~/printer_data/config/`). Add to your `printer.cfg`:
 
 ```ini
-[include macros/rack_slots.cfg]
-[include macros/ottoeject_macros.cfg]
-[include macros/printer_calibration_variables.cfg]
-[include macros/storage_calibration_variables.cfg]
+[include ottoeject_macros.cfg]
+[include printer_calibration_variables.cfg]
+[include storage_calibration_variables.cfg]
 
 # Activate your printer — uncomment one:
-;[include macros/_printer_x1c.cfg]
-;[include macros/_printer_p1s.cfg]
-;[include macros/_printer_p1p.cfg]
-;[include macros/_printer_a1.cfg]
-;[include macros/_printer_k1c.cfg]
-;[include macros/_printer_kobra_s1.cfg]
-;[include macros/_printer_elegoo_cc.cfg]
-;[include macros/_printer_flashforge_ad5x.cfg]
+;[include _printer_x1c.cfg]
+;[include _printer_p1s.cfg]
+;[include _printer_p1p.cfg]
+;[include _printer_a1.cfg]
+;[include _printer_k1c.cfg]
+;[include _printer_kobra_s1.cfg]
+;[include _printer_elegoo_cc.cfg]
+;[include _printer_flashforge_ad5x.cfg]
 ```
 
 ---
@@ -193,21 +190,28 @@ OttoBridge/
 ├── ottobridge.service      ← systemd unit
 ├── static/
 │   └── index.html          ← complete frontend (single file)
-├── klipper_macros/
-│   └── rack_slots.cfg      ← GRAB/STORE slot macros
-├── test_gcodes/            ← sample files for testing
-│   ├── phone_stand_15mm.gcode
-│   ├── cable_clip_38mm.gcode
-│   ├── vase_62mm.gcode
-│   ├── lamp_shade_118mm.gcode
-│   ├── voron_toolhead_165mm.gcode
-│   └── tall_column_340mm.gcode
 └── uploads/                ← auto-created, gitignored
 ```
 
 ---
 
-## Correct Macro Names
+## Multi-Material Systems
+
+| Printer | System | Status |
+|---|---|---|
+| Bambu X1C / P1S / P2S | AMS | ✅ Full support — `use_ams` + `ams_mapping` via MQTT |
+| Bambu A1 / A1 Mini | AMS Lite | ✅ Full support — AMS mapping is always normalized to 4 elements |
+| Anycubic Kobra S1 | ACE Pro | ✅ Works — tool changes (`T0`, `ACE_CHANGE_TOOL`) are embedded in gcode by slicer, handled by Klipper via the [ACEPRO driver](https://github.com/Kobra-S1/ACEPRO) |
+| Elegoo Centauri / CC | CANVAS | ✅ Works — Klipper-based, tool changes in gcode |
+| Creality K1C | CFS | ✅ Works — Klipper-based, tool changes in gcode |
+| Prusa MK4S | MMU3 | ✅ Works — tool changes in gcode, PrusaLink starts the file |
+| FlashForge | — | — No multi-material system |
+
+**Note for Bambu AMS:** OttoBridge always sends exactly 4 elements in `ams_mapping` as required by the Bambu firmware. Using fewer elements causes the printer to silently fall back to the external spool.
+
+**Note for Klipper-based printers (Anycubic, Elegoo, Creality):** Multi-material tool changes are handled entirely by Klipper and the respective module (ACEPRO, CANVAS, CFS). OttoBridge only starts the file via `SDCARD_PRINT_FILE` — no additional configuration needed in OttoBridge itself.
+
+
 
 OTTOengine used incorrect macro names internally. OttoBridge uses the exact names from the `.cfg` files:
 
