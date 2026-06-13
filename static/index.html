@@ -372,48 +372,64 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
   </div>
 </div>
 
-<!-- EINSTELLUNGEN -->
+<!-- PRINTER SETTINGS -->
 <div class="tab-pane" id="tab-einstellungen">
-  <div class="sec-title">Drucker hinzufügen</div>
+  <div class="sec-title">Add Printer</div>
   <div class="card">
     <div class="g2">
       <div>
         <div class="field"><label>Name</label><input type="text" id="cfg-name" placeholder="Farm X1C #1"></div>
-        <div class="field"><label>Marke</label><select id="cfg-brand" onchange="onBrand('cfg')"></select></div>
-        <div class="field"><label>Modell</label><select id="cfg-model"></select></div>
-        <div class="field"><label>IP-Adresse</label><input type="text" id="cfg-ip" placeholder="192.168.1.100"></div>
+        <div class="field"><label>Brand</label><select id="cfg-brand" onchange="onBrand('cfg')"></select></div>
+        <div class="field"><label>Model</label><select id="cfg-model"></select></div>
+        <div class="field"><label>IP Address</label><input type="text" id="cfg-ip" placeholder="192.168.1.100"></div>
       </div>
       <div>
         <div class="field"><label>Access Code <span style="color:var(--muted)">(Bambu)</span></label><input type="password" id="cfg-code" placeholder="LAN code"></div>
-        <div class="field"><label>Seriennummer <span style="color:var(--muted)">(Bambu)</span></label><input type="text" id="cfg-serial" placeholder="01S00A…"></div>
+        <div class="field"><label>Serial Number <span style="color:var(--muted)">(Bambu)</span></label><input type="text" id="cfg-serial" placeholder="01S00A…"></div>
         <div class="field"><label>API Key <span style="color:var(--muted)">(Prusa)</span></label><input type="password" id="cfg-apikey" placeholder="PrusaLink key"></div>
         <div class="field"><label>Serial + Check Code <span style="color:var(--muted)">(FlashForge)</span></label>
           <div style="display:flex;gap:7px"><input type="text" id="cfg-sc" placeholder="Serial"><input type="password" id="cfg-cc" placeholder="Check"></div>
         </div>
       </div>
     </div>
-    <div class="btn-row"><button class="btn btn-acc" onclick="addFromSettings()">Hinzufügen & Verbinden</button></div>
+    <div class="btn-row"><button class="btn btn-acc" onclick="addFromSettings()">Add &amp; Connect</button></div>
   </div>
   <hr class="divider">
-  <div class="sec-title">Mainsail-Integration</div>
+  <div class="sec-title">OttoEject Calibration</div>
+  <div class="card">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.7">
+      Run these commands when setting up OttoEject for the first time or after a configuration change.
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-sm" onclick="qg('OTTOEJECT_HOME')" title="G28 Y → G28 X → G28 Z → G1 Y10 X10 Z10">OttoEject Home</button>
+      <button class="btn btn-sm" id="calib-z-btn" onclick="sendCalibMove()" title="Move to starting position for OttoEject calibration">Z → 200mm</button>
+      <button class="btn btn-sm" onclick="qg('PARK_OTTOEJECT')">Park OttoEject</button>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-top:8px;font-family:var(--mono);line-height:1.8">
+      OTTOEJECT_HOME: G28 Y → G28 X → G28 Z → G1 Y10 X10 Z10<br>
+      <span id="calib-cmd-hint">Z → 200mm: G1 Z200 F3000 (CoreXY)</span>
+    </div>
+  </div>
+  <hr class="divider">
+  <div class="sec-title">Mainsail Integration</div>
   <div class="card">
     <div style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
-      OttoBridge als Tab in Mainsail einbinden — füge dies in <code style="background:var(--brd2);padding:1px 5px;border-radius:2px">moonraker.conf</code> ein:
+      Embed OttoBridge as a link in Mainsail — add this to <code style="background:var(--brd2);padding:1px 5px;border-radius:2px">moonraker.conf</code>:
     </div>
     <div style="background:var(--bg);border:1px solid var(--brd2);border-radius:2px;padding:12px;font-family:var(--mono);font-size:11px;color:#808090;line-height:1.8" id="mainsail-snippet"></div>
-    <div class="btn-row"><button class="btn btn-sm" onclick="copySnippet()">Kopieren</button></div>
+    <div class="btn-row"><button class="btn btn-sm" onclick="copySnippet()">Copy</button></div>
     <div style="font-size:10px;color:var(--muted);margin-top:10px;line-height:1.7">
-      Mainsail hat kein natives Plugin-System — die empfohlene Methode ist ein <code style="background:var(--brd2);padding:1px 4px;border-radius:2px">[application]</code>-Eintrag in Moonraker, der OttoBridge als externen Link im Seitenmenü erscheinen lässt. OttoBridge läuft weiterhin eigenständig auf Port 8080.
+      Mainsail has no native plugin system. The recommended method is an <code style="background:var(--brd2);padding:1px 4px;border-radius:2px">[application]</code> entry in Moonraker, which shows OttoBridge as an external link in the sidebar. OttoBridge continues to run independently on port 8080.
     </div>
   </div>
   <hr class="divider">
-  <div class="sec-title">Pi Zero 2 W — Ressourcen</div>
+  <div class="sec-title">Pi Zero 2 W — Resources</div>
   <div class="card">
     <div class="kv-row"><span class="kv-key">Klipper</span><span style="color:var(--muted)">~40 MB RAM</span></div>
     <div class="kv-row"><span class="kv-key">Moonraker</span><span style="color:var(--muted)">~60 MB RAM</span></div>
     <div class="kv-row"><span class="kv-key">OttoBridge</span><span style="color:var(--grn)">~30 MB RAM</span></div>
     <div class="kv-row"><span class="kv-key">Reserve</span><span style="color:var(--grn)">~380 MB ✓</span></div>
-    <div class="kv-row"><span class="kv-key">CPU-Last (idle)</span><span style="color:var(--muted)">&lt; 5 % pro Drucker</span></div>
+    <div class="kv-row"><span class="kv-key">CPU load (idle)</span><span style="color:var(--muted)">&lt; 5% per printer</span></div>
   </div>
 </div>
 
@@ -935,7 +951,34 @@ async function sendGcode(){
 }
 async function qg(cmd){
   const pid=document.getElementById('console-printer').value;
-  if(!pid){toast('err','Bitte Drucker wählen');return;}
+  if(!pid){toast('err','Please select a printer');return;}
+  logG(cmd,'sent');await api('POST','/api/gcode',{printer_id:pid,command:cmd});
+}
+
+const COREXY_MODELS=new Set(['X1C','P1S','P1P','A1','A1 Mini','P2S','Core One','K1C','K1','K1 Max','Kobra S1','Centauri Carbon','Centauri','AD5X','Adventurer 5M Pro','Adventurer 5M','Generic Klipper']);
+const Y_MAX_MM={'MK3S':210,'MK3':210,'MK4S':250,'MK4':250};
+
+function updateCalibHint(){
+  const pid=document.getElementById('console-printer')?.value;
+  const printer=S[pid];
+  if(!printer){return;}
+  const model=printer.model||'';
+  const isCoreXY=COREXY_MODELS.has(model);
+  const ymax=Y_MAX_MM[model]||210;
+  const hint=document.getElementById('calib-cmd-hint');
+  const btn=document.getElementById('calib-z-btn');
+  if(hint)hint.textContent=isCoreXY?`Z → 200mm: G1 Z200 F3000 (CoreXY)`:`Y → ${ymax}mm: G1 Y${ymax} F6000 (Cartesian)`;
+  if(btn)btn.textContent=isCoreXY?'Z → 200mm':`Y → ${ymax}mm`;
+}
+
+async function sendCalibMove(){
+  const pid=document.getElementById('console-printer').value;
+  if(!pid){toast('err','Please select a printer');return;}
+  const printer=S[pid];
+  const model=printer?.model||'';
+  const isCoreXY=COREXY_MODELS.has(model);
+  const ymax=Y_MAX_MM[model]||210;
+  const cmd=isCoreXY?'G1 Z200 F3000':`G1 Y${ymax} F6000`;
   logG(cmd,'sent');await api('POST','/api/gcode',{printer_id:pid,command:cmd});
 }
 function logG(line,type){
