@@ -556,21 +556,41 @@ async def delete_printer(pid: str):
 
 # ── Print control ─────────────────────────────────────────────────────────────
 @app.post("/api/print/start")
+def _normalize_ams_mapping(ams_map: list[int], use_ams: bool) -> list[int]:
+    """Bambu AMS mapping must always have exactly 4 elements (one per AMS slot).
+    If use_ams=False or list is empty, return [254,254,254,254] (external spool).
+    Otherwise pad/truncate to exactly 4 elements.
+    Reference: https://cinder.works/blog/bambu-ams-filament-mapping-guide
+    """
+    if not use_ams or not ams_map:
+        return [254, 254, 254, 254]  # 254 = external spool for all slots
+    # Pad with last element or truncate to exactly 4
+    mapping = list(ams_map)
+    while len(mapping) < 4:
+        mapping.append(mapping[-1])
+    return mapping[:4]
+
 async def start_print(req: StartPrint):
     p = printers.get(req.printer_id)
     if not p: raise HTTPException(404)
     if p.protocol == "mqtt_ftp":
+        # Bambu Lab: AMS mapping must be exactly 4 elements
+        # Multi-material (AMS/AMS Lite): use_ams=True + correct ams_mapping
+        # Single-material (external spool): use_ams=False, ams_mapping=[254,254,254,254]
+        ams_mapping = _normalize_ams_mapping(req.ams_map, req.use_ams)
         ok = await bambu_publish(req.printer_id, {"print": {
             "command":"project_file","sequence_id":_seq(),
             "file":req.filename,"url":f"ftp:///{req.filename}","param":"",
             "bed_type":req.bed_type,"bed_leveling":req.bed_level,
             "flow_cali":req.flow_cali,"vibration_cali":req.vibr_cali,
             "layer_inspect":req.layer_inspect,"use_ams":req.use_ams,
-            "ams_mapping":req.ams_map,"timelapse":req.timelapse,
+            "ams_mapping":ams_mapping,"timelapse":req.timelapse,
             "task_id":_seq(),"subtask_id":"0","project_id":"0","profile_id":"0",
             "subtask_name":Path(req.filename).name,"project_name":Path(req.filename).name,
         }})
     elif p.protocol == "prusalink":
+        # Prusa: MMU3 tool changes are embedded in the gcode by the slicer.
+        # PrusaLink does not accept filament mapping parameters — the gcode handles it.
         try:
             async with httpx.AsyncClient(timeout=10) as c:
                 r = await c.post(f"http://{p.ip}/api/v1/print",
@@ -578,8 +598,14 @@ async def start_print(req: StartPrint):
             ok = r.status_code in (200,201,204)
         except Exception as e: raise HTTPException(503, str(e))
     elif p.protocol in ("moonraker","websocket","websocket_elegoo"):
+        # Anycubic (ACE Pro), Elegoo (CANVAS), Creality (CFS):
+        # Multi-material tool changes (T0, T1, ACE_CHANGE_TOOL etc.) are embedded
+        # in the gcode by the slicer. Klipper/Moonraker handles them automatically
+        # via the respective Klipper modules (ACEPRO driver, etc.).
+        # OttoBridge only needs to start the file — no extra parameters needed.
         ok = await moonraker_gcode(req.printer_id, f"SDCARD_PRINT_FILE FILENAME={req.filename}")
     elif p.protocol == "http_tcp":
+        # FlashForge: no multi-material system supported
         try:
             async with httpx.AsyncClient(timeout=10) as c:
                 r = await c.post(f"http://{p.ip}:8898/print",
@@ -703,12 +729,50 @@ async def _run_klipper(macro: str):
         return {"ok": r.status_code == 200, "macro": macro}
     except Exception as e: raise HTTPException(503, f"Moonraker: {e}")
 
+COREXY_MODELS = {
+    "X1C","P1S","P1P","A1","A1 Mini","P2S",   # Bambu Lab
+    "Core One",                                  # Prusa Core One
+    "K1C","K1","K1 Max",                         # Creality
+    "Kobra S1",                                  # Anycubic
+    "Centauri Carbon","Centauri",                # Elegoo
+    "AD5X","Adventurer 5M Pro","Adventurer 5M",  # FlashForge
+    "Generic Klipper",
+}
+CARTESIAN_YMAX = {"MK3S":210,"MK3":210,"MK4S":250,"MK4":250}
+
+async def _send_printer_gcode(pid: str, cmd: str) -> bool:
+    """Send a gcode command to the printer itself (not Klipper/Moonraker)."""
+    p = printers.get(pid)
+    if not p: return False
+    if p.protocol == "mqtt_ftp":
+        return await bambu_publish(pid,
+            {"print":{"command":"gcode_line","sequence_id":_seq(),"param":cmd}})
+    else:
+        return await moonraker_gcode(pid, cmd)
+
 @app.post("/api/ottoeject/eject/{pid}")
 async def ej_eject(pid: str):
+    """Full eject sequence:
+    1. Move printer axis to safe position (sent to printer directly)
+    2. M400 — wait for move (sent to printer)
+    3. EJECT_FROM_<PRINTER> (sent to Klipper via Moonraker)
+    """
     p = printers.get(pid)
     if not p: raise HTTPException(404)
     m = get_eject_macro(p.brand, p.model)
     if not m: raise HTTPException(422, f"No eject macro for {p.brand} {p.model}")
+
+    # Step 1+2: move printer to safe position
+    if p.model in COREXY_MODELS:
+        move_cmd = "G1 Z200 F3000"
+    else:
+        ymax = CARTESIAN_YMAX.get(p.model, 210)
+        move_cmd = f"G1 Y{ymax} F6000"
+
+    await _send_printer_gcode(pid, move_cmd)
+    await _send_printer_gcode(pid, "M400")
+
+    # Step 3: eject via Klipper macro
     return await _run_klipper(m)
 
 @app.post("/api/ottoeject/load/{pid}")
