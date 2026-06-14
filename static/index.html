@@ -232,7 +232,8 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
     <div class="g2">
       <div>
         <div class="field"><label>Drucker</label><select id="job-printer"></select></div>
-        <div class="field"><label>Datei</label><select id="job-file"><option value="">— wählen —</option></select></div>
+        <div class="field"><label>Datei</label><select id="job-file" onchange="onJobFileChange()"><option value="">— wählen —</option></select></div>
+        <div id="job-file-info" style="display:none;margin-top:6px"></div>
         <div class="field"><label>Betttyp</label>
           <select id="job-bed">
             <option value="textured_plate">Textured Plate</option>
@@ -690,7 +691,60 @@ async function loadFiles(){
 }
 
 async function delFile(name){await api('DELETE',`/api/files/${encodeURIComponent(name)}`);toast('ok',`${name} gelöscht`);loadFiles();}
-function quickPrint(fn){switchTab('jobs');document.getElementById('job-file').value=fn;}
+function quickPrint(fn){switchTab('jobs');document.getElementById('job-file').value=fn;onJobFileChange();}
+
+// Holds the last analysis result, used when queuing/starting the job
+let lastAnalysis=null;
+
+async function onJobFileChange(){
+  const fn=document.getElementById('job-file').value;
+  const box=document.getElementById('job-file-info');
+  lastAnalysis=null;
+  if(!fn){box.style.display='none';box.innerHTML='';return;}
+  box.innerHTML=`<div style="font-size:10px;color:var(--muted)">Analyzing…</div>`;
+  box.style.display='block';
+  try{
+    const r=await api('GET',`/api/analyze/${encodeURIComponent(fn)}`);
+    lastAnalysis=r;
+    renderJobFileInfo(r);
+  }catch(e){
+    box.innerHTML=`<div style="font-size:10px;color:var(--err)">⚠ ${esc(e.message)}</div>`;
+  }
+  updateJobSlotPreview();
+}
+
+function renderJobFileInfo(r){
+  const box=document.getElementById('job-file-info');
+  let html=`<div class="card" style="padding:8px 10px;font-size:10px;color:var(--muted)">
+    <div class="kv-row"><span class="kv-key">Height</span><span>${r.height_mm.toFixed(1)} mm</span></div>
+    <div class="kv-row"><span class="kv-key">Slots needed</span><span style="color:${r.slots_needed>3?'var(--warn)':'var(--text)'}">${r.slots_needed}</span></div>`;
+
+  if(r.multi_material){
+    html+=`<div class="kv-row"><span class="kv-key">Multi-material</span><span style="color:var(--info)">AMS detected — ${r.active_count} filament${r.active_count>1?'s':''}</span></div>`;
+    html+=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:6px">`;
+    for(let i=0;i<4;i++){
+      const used=r.used_slots[i];
+      const colour=r.colours[i]||'#444';
+      const type=r.types[i]||'—';
+      html+=`<div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 2px;border:1px solid var(--brd2);border-radius:2px;opacity:${used?'1':'.35'}">
+        <div style="width:16px;height:16px;border-radius:50%;background:${colour};border:1px solid rgba(255,255,255,.2)"></div>
+        <div style="font-size:8px;font-family:var(--mono)">AMS${i+1}</div>
+        <div style="font-size:8px;font-family:var(--mono)">${used?type:'—'}</div>
+      </div>`;
+    }
+    html+=`</div>`;
+    html+=`<div style="font-size:9px;font-family:var(--mono);margin-top:6px;color:var(--muted)">ams_mapping = [${r.ams_mapping.join(',')}]</div>`;
+  } else {
+    html+=`<div class="kv-row"><span class="kv-key">Multi-material</span><span>Single material — external spool</span></div>`;
+  }
+  html+=`</div>`;
+  box.innerHTML=html;
+  box.style.display='block';
+
+  // Auto-set the AMS toggle + mapping for this job
+  const amsToggle=document.getElementById('job-ams');
+  if(amsToggle) amsToggle.checked=!!r.use_ams;
+}
 
 // JOBS — Rack slot state cache
 let rackSlots=[];
@@ -782,6 +836,7 @@ function buildJob(){
   if(ps&&ps.state!=='empty'&&parkN!==grabN){toast('err',`Slot ${parkN} ist nicht frei`);return null;}
   return{printer_id:pid,filename:fn,bed_type:v('job-bed'),
     use_ams:document.getElementById('job-ams').checked,
+    ams_map:(lastAnalysis&&lastAnalysis.filename===fn)?lastAnalysis.ams_mapping:[254,254,254,254],
     bed_level:document.getElementById('job-level').checked,
     flow_cali:document.getElementById('job-flow').checked,
     vibr_cali:document.getElementById('job-vibr').checked,
