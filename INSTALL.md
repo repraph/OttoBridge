@@ -67,27 +67,31 @@ When it's done, you'll see something like:
 
 ## Step 4 — Add OttoBridge to Mainsail (do this now)
 
-Before going further, add OttoBridge as a link in Mainsail's sidebar so you can always find it. SSH into the Pi (if not already) and edit `moonraker.conf`:
+Before going further, add OttoBridge as a link in Mainsail's sidebar so you can always find it.
+
+SSH into the Pi and create the theme folder if it doesn't exist yet:
 
 ```bash
-nano ~/printer_data/config/moonraker.conf
+mkdir -p ~/printer_data/config/.theme
+nano ~/printer_data/config/.theme/navi.json
 ```
 
-Add this block at the end of the file:
+Add the following content:
 
-```ini
-[application OttoBridge]
-type: adhoc
-website: http://localhost:8080
+```json
+[
+  {
+    "title": "OttoBridge",
+    "href": "http://localhost:8080",
+    "target": "_blank",
+    "position": 95
+  }
+]
 ```
 
-Save (`Ctrl+O`, `Enter`, `Ctrl+X`) and restart Moonraker:
+Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`). Reload Mainsail in your browser — OttoBridge now appears as a link near the bottom of the sidebar and opens in a new tab.
 
-```bash
-sudo systemctl restart moonraker
-```
-
-Reload Mainsail in your browser — OttoBridge now appears as a link in the sidebar.
+> If you already have other entries in `navi.json`, add the OttoBridge object to the existing array instead of replacing the file.
 
 ---
 

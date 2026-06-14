@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.png" alt="OttoBridge" width="1200">
+  <img src="docs/logo.png" alt="OttoBridge" width="600">
 </p>
 
 # OttoBridge
@@ -76,11 +76,13 @@ No additional macros needed. `GRAB_FROM_SLOT_N` and `STORE_TO_SLOT_N` are alread
 
 ## Mainsail Sidebar
 
-```ini
-# moonraker.conf
-[application OttoBridge]
-type: adhoc
-website: http://localhost:8080
+Add a link to OttoBridge in Mainsail's sidebar via `.theme/navi.json` (see [INSTALL.md](INSTALL.md) for details):
+
+```json
+// ~/printer_data/config/.theme/navi.json
+[
+  { "title": "OttoBridge", "href": "http://localhost:8080", "target": "_blank", "position": 95 }
+]
 ```
 
 ---
