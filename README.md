@@ -1,8 +1,14 @@
+<p align="center">
+  <img src="docs/logo.png" alt="OttoBridge" width="600">
+</p>
+
 # OttoBridge
 
 Lightweight web orchestrator for 3D print farms with OttoEject rack automation. Runs on a Raspberry Pi Zero 2 W alongside Klipper + Moonraker (~30 MB RAM). No Electron, no Node.js, no build step.
 
 📖 **First time? → [INSTALL.md](INSTALL.md)**
+
+OttoBridge is inspired by and built for the [OttoEject](https://www.ottomat3d.com/) hardware ecosystem by [OTTOMAT3D](https://www.ottomat3d.com/) — a 6-slot automated storage rack and pick-and-place system for 3D printers. OttoBridge is an independent, community-built orchestrator and is not affiliated with or endorsed by OTTOMAT3D.
 
 ---
 
