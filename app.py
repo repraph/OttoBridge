@@ -6,7 +6,7 @@ Supports: Bambu Lab (X1C, P1S, P1P, A1, P2S), Prusa (MK3/MK4/Core One),
 Pi Zero 2 W — runs alongside Klipper + Moonraker
 """
 
-import asyncio, ftplib, json, logging, os, ssl, time, uuid
+import asyncio, ftplib, json, logging, os, re, ssl, time, uuid, zipfile, io
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
@@ -555,7 +555,8 @@ async def delete_printer(pid: str):
     printers.pop(pid, None); save_config(); return {"ok": True}
 
 # ── Print control ─────────────────────────────────────────────────────────────
-@app.post("/api/print/start")
+SLOT_GAP_MM = 55  # global_slot_gap (25mm) + 30mm offset, see storage_calibration_variables.cfg
+
 def _normalize_ams_mapping(ams_map: list[int], use_ams: bool) -> list[int]:
     """Bambu AMS mapping must always have exactly 4 elements (one per AMS slot).
     If use_ams=False or list is empty, return [254,254,254,254] (external spool).
@@ -570,6 +571,138 @@ def _normalize_ams_mapping(ams_map: list[int], use_ams: bool) -> list[int]:
         mapping.append(mapping[-1])
     return mapping[:4]
 
+_HEIGHT_PATTERNS = (
+    re.compile(rb";MAX_LAYER_Z:([\d.]+)", re.I),
+    re.compile(rb";\s*total height\s*[=:]\s*([\d.]+)", re.I),
+    re.compile(rb";LAYER_HEIGHT:([\d.]+)", re.I),
+)
+
+def _scan_height(data: bytes) -> Optional[float]:
+    for pat in _HEIGHT_PATTERNS:
+        m = pat.search(data)
+        if m: return float(m.group(1))
+    # Fallback: scan Z-moves in first 500KB
+    mx = 0.0
+    for m in re.finditer(rb"^G[01] [^;\n]*Z([\d.]+)", data[:500_000], re.M):
+        z = float(m.group(1))
+        if z > mx: mx = z
+    return mx or None
+
+_COLOUR_RE = re.compile(rb";\s*filament_colour\s*=\s*(.+)", re.I)
+_TYPE_RE   = re.compile(rb";\s*filament_type\s*=\s*(.+)", re.I)
+_USED_RE   = re.compile(rb";\s*filament_used \[g\]\s*=\s*(.+)", re.I)
+_TOOL_RE   = re.compile(rb"(?:^|\n)T(\d+)")
+
+def _scan_ams(data: bytes) -> dict:
+    """Parse slicer header comments for multi-material/AMS info.
+    Works for plain .gcode and the gcode extracted from .3mf/.gcode.3mf."""
+    cm = _COLOUR_RE.search(data)
+    if not cm:
+        return {"multi_material": False}
+    colours = [c.strip().decode() for c in re.split(rb"[;,]", cm.group(1).strip()) if c.strip()]
+    tm = _TYPE_RE.search(data)
+    types = [t.strip().decode() for t in re.split(rb"[;,]", tm.group(1).strip())] if tm else []
+    um = _USED_RE.search(data)
+    used = [float(u) for u in re.split(rb"[;,]", um.group(1).strip())] if um else []
+
+    if used:
+        used_slots = [u > 0 for u in used[:len(colours)]]
+    else:
+        used_slots = [True] * len(colours)
+
+    tool_changes = sorted({int(t) for t in _TOOL_RE.findall(data[:200_000])})
+    active = sum(used_slots)
+    multi = active > 1 or len(tool_changes) > 1
+
+    return {
+        "multi_material": multi,
+        "colours": colours,
+        "types": types,
+        "used_slots": used_slots,
+        "active_count": active,
+        "tool_changes": tool_changes,
+    }
+
+def _ams_mapping_from_scan(ams: dict) -> list[int]:
+    """Build a 4-element ams_mapping from scanned slot usage.
+    Maps used slots to AMS tray indices 0..3 in order; unused -> 254."""
+    if not ams.get("multi_material"):
+        return [254, 254, 254, 254]
+    mapping, tray = [], 0
+    for used in ams.get("used_slots", []):
+        if used:
+            mapping.append(tray); tray += 1
+        else:
+            mapping.append(254)
+    while len(mapping) < 4: mapping.append(254)
+    return mapping[:4]
+
+def analyze_print_file(filename: str, data: bytes) -> dict:
+    """Analyze a .gcode, .3mf or .gcode.3mf file: print height + multi-material info."""
+    lower = filename.lower()
+    gcode_data = data
+    if lower.endswith(".3mf") or lower.endswith(".gcode.3mf"):
+        # .3mf (and .gcode.3mf) is a ZIP archive — find the plate gcode inside
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                gcode_names = [n for n in zf.namelist()
+                                if n.lower().endswith(".gcode") and "metadata" in n.lower()]
+                if not gcode_names:
+                    gcode_names = [n for n in zf.namelist() if n.lower().endswith(".gcode")]
+                if gcode_names:
+                    gcode_data = zf.read(gcode_names[0])
+        except zipfile.BadZipFile:
+            pass  # not a valid zip — fall back to scanning raw bytes
+
+    height = _scan_height(gcode_data)
+    ams = _scan_ams(gcode_data)
+    slots_needed = None
+    if height:
+        slots_needed = max(1, -(-int(height) // SLOT_GAP_MM))  # ceil division
+
+    return {
+        "filename": filename,
+        "height_mm": height,
+        "slots_needed": slots_needed,
+        "multi_material": ams.get("multi_material", False),
+        "colours": ams.get("colours", []),
+        "types": ams.get("types", []),
+        "used_slots": ams.get("used_slots", []),
+        "active_count": ams.get("active_count", 0),
+        "use_ams": ams.get("multi_material", False),
+        "ams_mapping": _ams_mapping_from_scan(ams),
+    }
+
+@app.post("/api/analyze")
+async def analyze_file(file: UploadFile = File(...)):
+    """Upload a .gcode/.3mf/.gcode.3mf and get height + AMS info without
+    transferring it to a printer yet. Used by the Jobs tab for slot
+    calculation and automatic use_ams/ams_mapping detection."""
+    name = file.filename or "upload.gcode"
+    if not (name.lower().endswith((".gcode", ".3mf")) or name.lower().endswith(".gcode.3mf")):
+        raise HTTPException(400, "Only .gcode, .3mf or .gcode.3mf supported")
+    data = await file.read()
+    if len(data) > 200 * 1024 * 1024:
+        raise HTTPException(413, "File too large")
+    result = analyze_print_file(name, data)
+    if result["height_mm"] is None:
+        raise HTTPException(422, f'Could not detect print height in "{name}"')
+    return result
+
+@app.get("/api/analyze/{filename}")
+async def analyze_stored_file(filename: str):
+    """Analyze a file already in UPLOAD_DIR (selected from the Jobs file list)."""
+    path = UPLOAD_DIR / filename
+    if not path.exists(): raise HTTPException(404, "File not found")
+    data = await asyncio.get_event_loop().run_in_executor(None, path.read_bytes)
+    if len(data) > 200 * 1024 * 1024:
+        raise HTTPException(413, "File too large")
+    result = analyze_print_file(filename, data)
+    if result["height_mm"] is None:
+        raise HTTPException(422, f'Could not detect print height in "{filename}"')
+    return result
+
+@app.post("/api/print/start")
 async def start_print(req: StartPrint):
     p = printers.get(req.printer_id)
     if not p: raise HTTPException(404)
@@ -665,7 +798,8 @@ async def gcode(req: GcodeReq):
 async def upload(pid: str, file: UploadFile = File(...)):
     p = printers.get(pid)
     if not p: raise HTTPException(404)
-    if not file.filename.endswith((".3mf",".gcode")): raise HTTPException(400,"Only .3mf/.gcode")
+    if not (file.filename.endswith((".3mf",".gcode")) or file.filename.lower().endswith(".gcode.3mf")):
+        raise HTTPException(400,"Only .3mf/.gcode/.gcode.3mf")
     dest = UPLOAD_DIR / file.filename
     async with aiofiles.open(dest, "wb") as f:
         while chunk := await file.read(65536): await f.write(chunk)
@@ -683,7 +817,8 @@ async def upload(pid: str, file: UploadFile = File(...)):
 @app.get("/api/files")
 async def list_files():
     return [{"name":fp.name,"size":fp.stat().st_size,"mtime":fp.stat().st_mtime}
-            for fp in sorted(UPLOAD_DIR.iterdir()) if fp.suffix in (".3mf",".gcode")]
+            for fp in sorted(UPLOAD_DIR.iterdir())
+            if fp.suffix in (".3mf",".gcode") or fp.name.lower().endswith(".gcode.3mf")]
 
 @app.delete("/api/files/{filename}")
 async def del_file(filename: str):
