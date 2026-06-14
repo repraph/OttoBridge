@@ -65,7 +65,33 @@ When it's done, you'll see something like:
 
 ---
 
-## Step 4 — Open OttoBridge
+## Step 4 — Add OttoBridge to Mainsail (do this now)
+
+Before going further, add OttoBridge as a link in Mainsail's sidebar so you can always find it. SSH into the Pi (if not already) and edit `moonraker.conf`:
+
+```bash
+nano ~/printer_data/config/moonraker.conf
+```
+
+Add this block at the end of the file:
+
+```ini
+[application OttoBridge]
+type: adhoc
+website: http://localhost:8080
+```
+
+Save (`Ctrl+O`, `Enter`, `Ctrl+X`) and restart Moonraker:
+
+```bash
+sudo systemctl restart moonraker
+```
+
+Reload Mainsail in your browser — OttoBridge now appears as a link in the sidebar.
+
+---
+
+## Step 5 — Open OttoBridge
 
 Open a browser and go to:
 
@@ -77,7 +103,7 @@ You should see the OttoBridge dashboard.
 
 ---
 
-## Step 5 — Connect your printer
+## Step 6 — Connect your printer
 
 Go to the **Printer** tab and fill in your printer details:
 
@@ -102,7 +128,7 @@ Click **Connect**. The status dot turns green when the connection is successful.
 
 ---
 
-## Step 6 — Connect OttoEject (Moonraker)
+## Step 7 — Connect OttoEject (Moonraker)
 
 Go to the **OttoEject** tab and click **Connect**. OttoBridge connects to Moonraker on `http://localhost:7125` by default — this is already correct if OttoBridge runs on the same Pi as Klipper.
 
@@ -110,7 +136,7 @@ If Klipper runs on a different machine, change the Moonraker URL to `http://<kli
 
 ---
 
-## Step 7 — Calibrate OttoEject
+## Step 8 — Calibrate OttoEject
 
 Before using the rack for the first time:
 
@@ -121,7 +147,7 @@ Before using the rack for the first time:
 
 ---
 
-## Step 8 — Set up your rack slots
+## Step 9 — Set up your rack slots
 
 Go to the **Rack** tab. You'll see 6 slots (Slot 1 at the bottom). For each slot that has a print plate loaded:
 
@@ -131,7 +157,7 @@ This tells OttoBridge which slots have plates ready for printing.
 
 ---
 
-## Step 9 — Add your first print job
+## Step 10 — Add your first print job
 
 Go to the **Jobs** tab:
 
@@ -143,24 +169,6 @@ Go to the **Jobs** tab:
 4. Click **+ Queue — lock slots**
 
 Repeat for each job. Then click **▶ Start queue**.
-
----
-
-## Mainsail Sidebar Integration (optional)
-
-To show OttoBridge as a link in Mainsail's sidebar, add this to your `moonraker.conf`:
-
-```ini
-[application OttoBridge]
-type: adhoc
-website: http://localhost:8080
-```
-
-Then restart Moonraker:
-
-```bash
-sudo systemctl restart moonraker
-```
 
 ---
 
