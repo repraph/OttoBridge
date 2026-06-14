@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.png" alt="OttoBridge" width="600">
+  <img src="docs/logo.png" alt="OttoBridge" width="1200">
 </p>
 
 # OttoBridge
