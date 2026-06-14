@@ -146,7 +146,7 @@ Repeat for each job. Then click **▶ Start queue**.
 
 ---
 
-## Mainsail Sidebar Integration (optional)
+## Step 10 — Mainsail Sidebar Integration
 
 To show OttoBridge as a link in Mainsail's sidebar, add this to your `moonraker.conf`:
 
