@@ -6,7 +6,7 @@ Supports: Bambu Lab (X1C, P1S, P1P, A1, P2S), Prusa (MK3/MK4/Core One),
 Pi Zero 2 W — runs alongside Klipper + Moonraker
 """
 
-import asyncio, ftplib, json, logging, os, ssl, time, uuid
+import asyncio, ftplib, json, logging, os, re, ssl, time, uuid, zipfile, io
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
@@ -187,23 +187,123 @@ class PrinterState:
         }
 
 # ── Rack state ─────────────────────────────────────────────────────────────────
+SLOT_GAP_MM = 55  # matches storage_calibration_variables.cfg global_slot_gap + offset
+
 class RackState:
+    """
+    Slot states:
+      empty          - no plate, nothing in this slot
+      ready          - plate present, available to grab
+      grab_reserved  - plate is being picked up for an active job
+      park           - this is the bottom slot of an active/printed job (has plate + print)
+      printed        - job finished, plate+print sit here, awaiting removal
+
+    Print overlays describe a print that spans 1+ slots above its park (bottom) slot.
+    Slots covered by an overlay (other than the bottom park slot) have NO plate and are
+    blocked for new "ready" plates until the user clears the overlay (clear_print).
+    """
     def __init__(self):
         self.num_slots = 6
-        # slot: {state: "empty"|"ready", label: str, note: str}
-        self.slots: list[dict] = [{"state": "empty", "label": "", "note": ""} for _ in range(self.num_slots)]
+        self.slots: list[dict] = [{"state": "empty", "label": "", "note": "", "job_id": None}
+                                   for _ in range(self.num_slots)]
+        # overlays: [{job_id, bottom_slot(0-idx), slots_needed, height_mm, file, done}]
+        self.overlays: list[dict] = []
 
     def resize(self, n: int):
         n = max(1, min(30, n))
         if n > len(self.slots):
             for _ in range(n - len(self.slots)):
-                self.slots.append({"state": "empty", "label": "", "note": ""})
+                self.slots.append({"state": "empty", "label": "", "note": "", "job_id": None})
         elif n < len(self.slots):
             self.slots = self.slots[:n]
         self.num_slots = n
 
+    def blocked_indices(self) -> set[int]:
+        """Slot indices blocked by active print overlays (cannot insert a plate)."""
+        blocked = set()
+        for ov in self.overlays:
+            for k in range(1, ov["slots_needed"]):
+                idx = ov["bottom_slot"] + k
+                if idx < self.num_slots: blocked.add(idx)
+            # If the print overflows its allocated slots, block one extra slot above
+            if ov["height_mm"] > ov["slots_needed"] * SLOT_GAP_MM:
+                idx = ov["bottom_slot"] + ov["slots_needed"]
+                if idx < self.num_slots: blocked.add(idx)
+        return blocked
+
+    def check_park(self, bottom_slot: int, slots_needed: int) -> Optional[str]:
+        """Validate a park assignment. Returns an error string, or None if OK.
+        Slot 6 (last slot) is open-topped: prints can extend above it without limit."""
+        if bottom_slot < 0 or bottom_slot >= self.num_slots:
+            return "Invalid slot"
+        blocked = self.blocked_indices()
+        last = self.num_slots - 1
+        for k in range(slots_needed):
+            idx = bottom_slot + k
+            if idx > last:
+                # Above the top slot: open rack, always OK
+                continue
+            if idx in blocked:
+                return f"Slot {idx+1} is blocked by another print"
+            s = self.slots[idx]
+            if k == 0:
+                if s["state"] not in ("empty", "ready", "grab_reserved"):
+                    return f"Slot {idx+1} is not available"
+            else:
+                if s["state"] != "empty":
+                    return f"Slot {idx+1} is occupied"
+        return None
+
+    def reserve_for_job(self, job_id: str, grab_slot: Optional[int], bottom_slot: int,
+                         slots_needed: int, height_mm: float, filename: str):
+        if grab_slot is not None:
+            self.slots[grab_slot] = {"state": "grab_reserved", "label": filename,
+                                      "note": "", "job_id": job_id}
+        self.slots[bottom_slot] = {"state": "park", "label": filename,
+                                    "note": "", "job_id": job_id}
+        self.overlays.append({"job_id": job_id, "bottom_slot": bottom_slot,
+                               "slots_needed": slots_needed, "height_mm": height_mm,
+                               "file": filename, "done": False})
+
+    def free_job_slots(self, job_id: str):
+        """Free grab + park slots for a job (used on abort/skip/stop).
+        Removes the print overlay entirely so blocked slots above become available."""
+        for i, s in enumerate(self.slots):
+            if s.get("job_id") == job_id:
+                self.slots[i] = {"state": "empty", "label": "", "note": "", "job_id": None}
+        self.overlays = [o for o in self.overlays if o["job_id"] != job_id]
+
+    def mark_printed(self, job_id: str):
+        """Mark the bottom (park) slot as printed; overlay stays (still blocks upper slots)
+        until the user clears the print via clear_print()."""
+        for i, s in enumerate(self.slots):
+            if s.get("job_id") == job_id and s["state"] == "park":
+                self.slots[i]["state"] = "printed"
+        for ov in self.overlays:
+            if ov["job_id"] == job_id: ov["done"] = True
+
+    def clear_print(self, slot_index: int):
+        """User confirms the finished print + plate were physically removed.
+        Frees the printed slot AND any slots blocked by its overlay."""
+        s = self.slots[slot_index]
+        job_id = s.get("job_id")
+        self.slots[slot_index] = {"state": "empty", "label": "", "note": "", "job_id": None}
+        if job_id:
+            self.overlays = [o for o in self.overlays if o["job_id"] != job_id]
+            # also clear any other slots tagged with this job_id (shouldn't normally happen)
+            for i, s2 in enumerate(self.slots):
+                if s2.get("job_id") == job_id:
+                    self.slots[i] = {"state": "empty", "label": "", "note": "", "job_id": None}
+
+    def free_grab_slot(self, slot_index: int):
+        """Manually free a grab_reserved slot (plate was already picked, slot is empty)."""
+        s = self.slots[slot_index]
+        if s["state"] == "grab_reserved":
+            self.slots[slot_index] = {"state": "empty", "label": "", "note": "", "job_id": None}
+
     def to_dict(self):
-        return {"num_slots": self.num_slots, "slots": self.slots}
+        return {"num_slots": self.num_slots, "slots": self.slots,
+                "overlays": self.overlays, "blocked": sorted(self.blocked_indices())}
 
 rack = RackState()
 
@@ -483,7 +583,10 @@ async def lifespan(app: FastAPI):
     rc = cfg.get("rack", {})
     if rc.get("num_slots"): rack.resize(rc["num_slots"])
     for i, s in enumerate(rc.get("slots", [])):
-        if i < len(rack.slots): rack.slots[i] = s
+        if i < len(rack.slots):
+            s.setdefault("job_id", None)
+            rack.slots[i] = s
+    rack.overlays = rc.get("overlays", [])
     yield
     for t in mqtt_tasks.values():
         if not t.done(): t.cancel()
@@ -504,8 +607,10 @@ class StartPrint(BaseModel):
     bed_type: str = "textured_plate"; bed_level: bool = True
     flow_cali: bool = True; vibr_cali: bool = True
     layer_inspect: bool = True; timelapse: bool = False
-    grab_slot: Optional[int] = None   # rack slot to grab plate from before print
-    park_slot: Optional[int] = None   # rack slot to park plate after print
+    grab_slot: Optional[int] = None   # rack slot (1-indexed) to grab plate from before print
+    park_slot: Optional[int] = None   # rack slot (1-indexed) to park plate after print
+    slots_needed: int = 1             # how many rack slots the print occupies
+    height_mm: float = 0.0            # detected print height, for the overlay display
 
 class PidOnly(BaseModel):
     printer_id: str
@@ -555,22 +660,175 @@ async def delete_printer(pid: str):
     printers.pop(pid, None); save_config(); return {"ok": True}
 
 # ── Print control ─────────────────────────────────────────────────────────────
+SLOT_GAP_MM = 55  # global_slot_gap (25mm) + 30mm offset, see storage_calibration_variables.cfg
+
+def _normalize_ams_mapping(ams_map: list[int], use_ams: bool) -> list[int]:
+    """Bambu AMS mapping must always have exactly 4 elements (one per AMS slot).
+    If use_ams=False or list is empty, return [254,254,254,254] (external spool).
+    Otherwise pad/truncate to exactly 4 elements.
+    Reference: https://cinder.works/blog/bambu-ams-filament-mapping-guide
+    """
+    if not use_ams or not ams_map:
+        return [254, 254, 254, 254]  # 254 = external spool for all slots
+    # Pad with last element or truncate to exactly 4
+    mapping = list(ams_map)
+    while len(mapping) < 4:
+        mapping.append(mapping[-1])
+    return mapping[:4]
+
+_HEIGHT_PATTERNS = (
+    re.compile(rb";MAX_LAYER_Z:([\d.]+)", re.I),
+    re.compile(rb";\s*total height\s*[=:]\s*([\d.]+)", re.I),
+    re.compile(rb";LAYER_HEIGHT:([\d.]+)", re.I),
+)
+
+def _scan_height(data: bytes) -> Optional[float]:
+    for pat in _HEIGHT_PATTERNS:
+        m = pat.search(data)
+        if m: return float(m.group(1))
+    # Fallback: scan Z-moves in first 500KB
+    mx = 0.0
+    for m in re.finditer(rb"^G[01] [^;\n]*Z([\d.]+)", data[:500_000], re.M):
+        z = float(m.group(1))
+        if z > mx: mx = z
+    return mx or None
+
+_COLOUR_RE = re.compile(rb";\s*filament_colour\s*=\s*(.+)", re.I)
+_TYPE_RE   = re.compile(rb";\s*filament_type\s*=\s*(.+)", re.I)
+_USED_RE   = re.compile(rb";\s*filament_used \[g\]\s*=\s*(.+)", re.I)
+_TOOL_RE   = re.compile(rb"(?:^|\n)T(\d+)")
+
+def _scan_ams(data: bytes) -> dict:
+    """Parse slicer header comments for multi-material/AMS info.
+    Works for plain .gcode and the gcode extracted from .3mf/.gcode.3mf."""
+    cm = _COLOUR_RE.search(data)
+    if not cm:
+        return {"multi_material": False}
+    colours = [c.strip().decode() for c in re.split(rb"[;,]", cm.group(1).strip()) if c.strip()]
+    tm = _TYPE_RE.search(data)
+    types = [t.strip().decode() for t in re.split(rb"[;,]", tm.group(1).strip())] if tm else []
+    um = _USED_RE.search(data)
+    used = [float(u) for u in re.split(rb"[;,]", um.group(1).strip())] if um else []
+
+    if used:
+        used_slots = [u > 0 for u in used[:len(colours)]]
+    else:
+        used_slots = [True] * len(colours)
+
+    tool_changes = sorted({int(t) for t in _TOOL_RE.findall(data[:200_000])})
+    active = sum(used_slots)
+    multi = active > 1 or len(tool_changes) > 1
+
+    return {
+        "multi_material": multi,
+        "colours": colours,
+        "types": types,
+        "used_slots": used_slots,
+        "active_count": active,
+        "tool_changes": tool_changes,
+    }
+
+def _ams_mapping_from_scan(ams: dict) -> list[int]:
+    """Build a 4-element ams_mapping from scanned slot usage.
+    Maps used slots to AMS tray indices 0..3 in order; unused -> 254."""
+    if not ams.get("multi_material"):
+        return [254, 254, 254, 254]
+    mapping, tray = [], 0
+    for used in ams.get("used_slots", []):
+        if used:
+            mapping.append(tray); tray += 1
+        else:
+            mapping.append(254)
+    while len(mapping) < 4: mapping.append(254)
+    return mapping[:4]
+
+def analyze_print_file(filename: str, data: bytes) -> dict:
+    """Analyze a .gcode, .3mf or .gcode.3mf file: print height + multi-material info."""
+    lower = filename.lower()
+    gcode_data = data
+    if lower.endswith(".3mf") or lower.endswith(".gcode.3mf"):
+        # .3mf (and .gcode.3mf) is a ZIP archive — find the plate gcode inside
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                gcode_names = [n for n in zf.namelist()
+                                if n.lower().endswith(".gcode") and "metadata" in n.lower()]
+                if not gcode_names:
+                    gcode_names = [n for n in zf.namelist() if n.lower().endswith(".gcode")]
+                if gcode_names:
+                    gcode_data = zf.read(gcode_names[0])
+        except zipfile.BadZipFile:
+            pass  # not a valid zip — fall back to scanning raw bytes
+
+    height = _scan_height(gcode_data)
+    ams = _scan_ams(gcode_data)
+    slots_needed = None
+    if height:
+        slots_needed = max(1, -(-int(height) // SLOT_GAP_MM))  # ceil division
+
+    return {
+        "filename": filename,
+        "height_mm": height,
+        "slots_needed": slots_needed,
+        "multi_material": ams.get("multi_material", False),
+        "colours": ams.get("colours", []),
+        "types": ams.get("types", []),
+        "used_slots": ams.get("used_slots", []),
+        "active_count": ams.get("active_count", 0),
+        "use_ams": ams.get("multi_material", False),
+        "ams_mapping": _ams_mapping_from_scan(ams),
+    }
+
+@app.post("/api/analyze")
+async def analyze_file(file: UploadFile = File(...)):
+    """Upload a .gcode/.3mf/.gcode.3mf and get height + AMS info without
+    transferring it to a printer yet. Used by the Jobs tab for slot
+    calculation and automatic use_ams/ams_mapping detection."""
+    name = file.filename or "upload.gcode"
+    if not (name.lower().endswith((".gcode", ".3mf")) or name.lower().endswith(".gcode.3mf")):
+        raise HTTPException(400, "Only .gcode, .3mf or .gcode.3mf supported")
+    data = await file.read()
+    if len(data) > 200 * 1024 * 1024:
+        raise HTTPException(413, "File too large")
+    result = analyze_print_file(name, data)
+    if result["height_mm"] is None:
+        raise HTTPException(422, f'Could not detect print height in "{name}"')
+    return result
+
+@app.get("/api/analyze/{filename}")
+async def analyze_stored_file(filename: str):
+    """Analyze a file already in UPLOAD_DIR (selected from the Jobs file list)."""
+    path = UPLOAD_DIR / filename
+    if not path.exists(): raise HTTPException(404, "File not found")
+    data = await asyncio.get_event_loop().run_in_executor(None, path.read_bytes)
+    if len(data) > 200 * 1024 * 1024:
+        raise HTTPException(413, "File too large")
+    result = analyze_print_file(filename, data)
+    if result["height_mm"] is None:
+        raise HTTPException(422, f'Could not detect print height in "{filename}"')
+    return result
+
 @app.post("/api/print/start")
 async def start_print(req: StartPrint):
     p = printers.get(req.printer_id)
     if not p: raise HTTPException(404)
     if p.protocol == "mqtt_ftp":
+        # Bambu Lab: AMS mapping must be exactly 4 elements
+        # Multi-material (AMS/AMS Lite): use_ams=True + correct ams_mapping
+        # Single-material (external spool): use_ams=False, ams_mapping=[254,254,254,254]
+        ams_mapping = _normalize_ams_mapping(req.ams_map, req.use_ams)
         ok = await bambu_publish(req.printer_id, {"print": {
             "command":"project_file","sequence_id":_seq(),
             "file":req.filename,"url":f"ftp:///{req.filename}","param":"",
             "bed_type":req.bed_type,"bed_leveling":req.bed_level,
             "flow_cali":req.flow_cali,"vibration_cali":req.vibr_cali,
             "layer_inspect":req.layer_inspect,"use_ams":req.use_ams,
-            "ams_mapping":req.ams_map,"timelapse":req.timelapse,
+            "ams_mapping":ams_mapping,"timelapse":req.timelapse,
             "task_id":_seq(),"subtask_id":"0","project_id":"0","profile_id":"0",
             "subtask_name":Path(req.filename).name,"project_name":Path(req.filename).name,
         }})
     elif p.protocol == "prusalink":
+        # Prusa: MMU3 tool changes are embedded in the gcode by the slicer.
+        # PrusaLink does not accept filament mapping parameters — the gcode handles it.
         try:
             async with httpx.AsyncClient(timeout=10) as c:
                 r = await c.post(f"http://{p.ip}/api/v1/print",
@@ -578,8 +836,14 @@ async def start_print(req: StartPrint):
             ok = r.status_code in (200,201,204)
         except Exception as e: raise HTTPException(503, str(e))
     elif p.protocol in ("moonraker","websocket","websocket_elegoo"):
+        # Anycubic (ACE Pro), Elegoo (CANVAS), Creality (CFS):
+        # Multi-material tool changes (T0, T1, ACE_CHANGE_TOOL etc.) are embedded
+        # in the gcode by the slicer. Klipper/Moonraker handles them automatically
+        # via the respective Klipper modules (ACEPRO driver, etc.).
+        # OttoBridge only needs to start the file — no extra parameters needed.
         ok = await moonraker_gcode(req.printer_id, f"SDCARD_PRINT_FILE FILENAME={req.filename}")
     elif p.protocol == "http_tcp":
+        # FlashForge: no multi-material system supported
         try:
             async with httpx.AsyncClient(timeout=10) as c:
                 r = await c.post(f"http://{p.ip}:8898/print",
@@ -639,7 +903,8 @@ async def gcode(req: GcodeReq):
 async def upload(pid: str, file: UploadFile = File(...)):
     p = printers.get(pid)
     if not p: raise HTTPException(404)
-    if not file.filename.endswith((".3mf",".gcode")): raise HTTPException(400,"Only .3mf/.gcode")
+    if not (file.filename.endswith((".3mf",".gcode")) or file.filename.lower().endswith(".gcode.3mf")):
+        raise HTTPException(400,"Only .3mf/.gcode/.gcode.3mf")
     dest = UPLOAD_DIR / file.filename
     async with aiofiles.open(dest, "wb") as f:
         while chunk := await file.read(65536): await f.write(chunk)
@@ -657,7 +922,8 @@ async def upload(pid: str, file: UploadFile = File(...)):
 @app.get("/api/files")
 async def list_files():
     return [{"name":fp.name,"size":fp.stat().st_size,"mtime":fp.stat().st_mtime}
-            for fp in sorted(UPLOAD_DIR.iterdir()) if fp.suffix in (".3mf",".gcode")]
+            for fp in sorted(UPLOAD_DIR.iterdir())
+            if fp.suffix in (".3mf",".gcode") or fp.name.lower().endswith(".gcode.3mf")]
 
 @app.delete("/api/files/{filename}")
 async def del_file(filename: str):
@@ -666,17 +932,318 @@ async def del_file(filename: str):
     return {"ok": True}
 
 # ── Job routes ─────────────────────────────────────────────────────────────────
+# ── Queue automation ─────────────────────────────────────────────────────────
+# Job lifecycle: queued -> running -> done | error | aborted | skipped
+# All jobs remain in `jobs` for history; only `queued` jobs can be removed while idle.
+#
+# Execution sequence per job (with grab_slot set):
+#   1. GRAB_FROM_SLOT_<grab>        (Moonraker/Klipper)
+#   2. LOAD_ONTO_<PRINTER>          (Moonraker/Klipper)
+#   3. start_print (file)           (printer protocol)
+#   4. wait for status FINISH       (poll)
+#   5. move axis to safe pos + M400 (printer protocol, sent to printer)
+#   6. EJECT_FROM_<PRINTER>         (Moonraker/Klipper)
+#   7. STORE_TO_SLOT_<park>         (Moonraker/Klipper)
+#
+# If grab_slot is None (plate already in printer), steps 1-2 are skipped.
+# On retry after an error during/after printing, steps 1-2 are also skipped
+# (the plate is already on the bed) — retry restarts from step 3.
+
+STEPS_FULL = ["grab", "load", "print", "wait", "move", "eject", "store"]
+STEPS_NOPLATE = ["print", "wait", "move", "eject", "store"]
+
+class QueueManager:
+    def __init__(self):
+        self.state = "idle"        # idle | running | paused | error
+        self.cur_job_id: Optional[str] = None
+        self.cur_step_idx = 0
+        self.retry_from_print = False
+        self.error_msg = ""
+        self.task: Optional[asyncio.Task] = None
+
+    def _steps(self, job: dict) -> list[str]:
+        if job.get("grab_slot") and not (self.retry_from_print and job["id"] == self.cur_job_id):
+            return STEPS_FULL
+        return STEPS_NOPLATE
+
+    def to_dict(self):
+        cur = next((j for j in jobs if j["id"] == self.cur_job_id), None)
+        return {
+            "state": self.state,
+            "current_job_id": self.cur_job_id,
+            "current_step": self.cur_step_idx,
+            "current_steps": self._steps(cur) if cur else [],
+            "retry_from_print": self.retry_from_print,
+            "error_msg": self.error_msg,
+        }
+
+    def start(self):
+        if self.state != "idle": return False
+        nxt = next((j for j in jobs if j["status"] == "queued"), None)
+        if not nxt: return False
+        self.state = "running"
+        self.cur_job_id = nxt["id"]
+        self.cur_step_idx = 0
+        self.retry_from_print = False
+        self.error_msg = ""
+        self.task = asyncio.create_task(self._run())
+        return True
+
+    def pause(self):
+        if self.state != "running": return False
+        self.state = "paused"
+        if self.task and not self.task.done(): self.task.cancel()
+        return True
+
+    def resume(self):
+        if self.state != "paused": return False
+        self.state = "running"
+        self.task = asyncio.create_task(self._run())
+        return True
+
+    def stop(self):
+        """Abort the current job and free its rack slots. Queue goes idle.
+        All job history (done/aborted/skipped/queued) remains visible."""
+        if self.task and not self.task.done(): self.task.cancel()
+        job = next((j for j in jobs if j["id"] == self.cur_job_id), None)
+        if job and job["status"] == "running":
+            job["status"] = "aborted"
+            rack.free_job_slots(job["id"])
+        self.state = "idle"
+        self.cur_job_id = None
+        self.cur_step_idx = 0
+        self.retry_from_print = False
+        self.error_msg = ""
+        return job
+
+    def retry(self):
+        """Retry the failed job. Skips grab/load — plate is already on the printer."""
+        if self.state != "error": return False
+        job = next((j for j in jobs if j["id"] == self.cur_job_id), None)
+        if not job: return False
+        job["status"] = "queued"
+        self.retry_from_print = True
+        self.cur_step_idx = 0
+        self.state = "running"
+        self.error_msg = ""
+        self.task = asyncio.create_task(self._run())
+        return True
+
+    def skip(self):
+        """Mark the failed job as skipped, free its slots, advance to next job."""
+        if self.state != "error": return False
+        job = next((j for j in jobs if j["id"] == self.cur_job_id), None)
+        if job:
+            job["status"] = "skipped"
+            rack.free_job_slots(job["id"])
+        self.state = "idle"
+        self.cur_job_id = None
+        self.cur_step_idx = 0
+        self.retry_from_print = False
+        self.error_msg = ""
+        self._advance_after_idle()
+        return True
+
+    def abort(self):
+        """Abort the failed job, free its slots. Same as skip but explicit
+        'abort & free slots' wording for the UI error banner."""
+        if self.state != "error": return False
+        job = next((j for j in jobs if j["id"] == self.cur_job_id), None)
+        if job:
+            job["status"] = "aborted"
+            rack.free_job_slots(job["id"])
+        self.state = "idle"
+        self.cur_job_id = None
+        self.cur_step_idx = 0
+        self.retry_from_print = False
+        self.error_msg = ""
+        self._advance_after_idle()
+        return True
+
+    def _advance_after_idle(self):
+        """After skip/abort, optionally auto-continue is NOT done — queue stays idle.
+        User must press Start again. (Manual-start, pause-on-error per spec.)"""
+        pass
+
+    async def _run(self):
+        try:
+            while self.state == "running":
+                job = next((j for j in jobs if j["id"] == self.cur_job_id), None)
+                if not job:
+                    self.state = "idle"; return
+                job["status"] = "running"
+                await broadcast("queue", self.to_dict())
+                steps = self._steps(job)
+
+                if self.cur_step_idx >= len(steps):
+                    # Job finished successfully
+                    job["status"] = "done"
+                    rack.mark_printed(job["id"])
+                    save_config()
+                    await broadcast("rack", rack.to_dict())
+                    await broadcast("job_done", job)
+                    nxt = next((j for j in jobs if j["status"] == "queued"), None)
+                    if nxt:
+                        self.cur_job_id = nxt["id"]
+                        self.cur_step_idx = 0
+                        self.retry_from_print = False
+                        await asyncio.sleep(1)
+                        continue
+                    else:
+                        self.state = "idle"
+                        self.cur_job_id = None
+                        await broadcast("queue", self.to_dict())
+                        return
+
+                step = steps[self.cur_step_idx]
+                ok = await self._exec_step(job, step)
+                if not ok:
+                    self.state = "error"
+                    self.error_msg = f'Step "{step}" failed for {job["filename"]}'
+                    await broadcast("queue", self.to_dict())
+                    return
+                self.cur_step_idx += 1
+                await broadcast("queue", self.to_dict())
+        except asyncio.CancelledError:
+            raise
+
+    async def _exec_step(self, job: dict, step: str) -> bool:
+        pid = job["printer_id"]
+        p = printers.get(pid)
+        if not p: return False
+        try:
+            if step == "grab":
+                r = await _run_klipper(f"GRAB_FROM_SLOT_{job['grab_slot']}")
+                return bool(r.get("ok"))
+            if step == "load":
+                m = get_load_macro(p.brand, p.model)
+                if not m: return True  # no load macro defined -> skip
+                r = await _run_klipper(m)
+                return bool(r.get("ok"))
+            if step == "print":
+                req = StartPrint(**{k: v for k, v in job.items()
+                                     if k in StartPrint.model_fields})
+                await start_print(req)
+                return True
+            if step == "wait":
+                return await self._wait_for_finish(pid)
+            if step == "move":
+                if p.model in COREXY_MODELS:
+                    move_cmd = "G1 Z200 F3000"
+                else:
+                    move_cmd = f"G1 Y{CARTESIAN_YMAX.get(p.model, 210)} F6000"
+                await _send_printer_gcode(pid, move_cmd)
+                await _send_printer_gcode(pid, "M400")
+                return True
+            if step == "eject":
+                m = get_eject_macro(p.brand, p.model)
+                if not m: return False
+                r = await _run_klipper(m)
+                return bool(r.get("ok"))
+            if step == "store":
+                r = await _run_klipper(f"STORE_TO_SLOT_{job['park_slot']}")
+                return bool(r.get("ok"))
+        except Exception as e:
+            log.error(f"Queue step '{step}' failed for job {job['id']}: {e}")
+            return False
+        return False
+
+    async def _wait_for_finish(self, pid: str) -> bool:
+        """Poll printer status until FINISH (success) or FAILED/CANCELLED (error)."""
+        while True:
+            if self.state != "running": return False
+            p = printers.get(pid)
+            if not p: return False
+            if p.status == "FINISH": return True
+            if p.status in ("FAILED", "CANCELLED", "STOPPED"): return False
+            await asyncio.sleep(3)
+
+queue_mgr = QueueManager()
+
 @app.get("/api/jobs")
 async def get_jobs(): return jobs
 
+@app.get("/api/queue")
+async def get_queue(): return queue_mgr.to_dict()
+
 @app.post("/api/jobs")
 async def add_job(req: StartPrint):
-    job = {"id": uuid.uuid4().hex[:8], "status":"queued", **req.model_dump()}
-    jobs.append(job); await broadcast("job_added", job); return job
+    """Queue a new job and reserve its rack slots (lock grab + park + overlay)."""
+    if req.park_slot is None:
+        raise HTTPException(400, "park_slot is required")
+    bottom = req.park_slot - 1
+    err = rack.check_park(bottom, max(1, req.slots_needed))
+    if err: raise HTTPException(409, err)
+    if req.grab_slot is not None:
+        gi = req.grab_slot - 1
+        if not (0 <= gi < rack.num_slots) or rack.slots[gi]["state"] != "ready":
+            raise HTTPException(409, f"Slot {req.grab_slot} has no plate")
+
+    job = {"id": uuid.uuid4().hex[:8], "status": "queued", **req.model_dump()}
+    jobs.append(job)
+    rack.reserve_for_job(job["id"], (req.grab_slot - 1) if req.grab_slot else None,
+                          bottom, max(1, req.slots_needed), req.height_mm, req.filename)
+    save_config()
+    await broadcast("job_added", job)
+    await broadcast("rack", rack.to_dict())
+    return job
 
 @app.delete("/api/jobs/{jid}")
 async def del_job(jid: str):
-    global jobs; jobs = [j for j in jobs if j["id"] != jid]; return {"ok": True}
+    """Remove a queued job and free its reserved slots.
+    Only allowed while the queue is idle and the job hasn't started."""
+    global jobs
+    job = next((j for j in jobs if j["id"] == jid), None)
+    if not job: raise HTTPException(404)
+    if job["status"] != "queued":
+        raise HTTPException(409, "Only queued jobs can be removed")
+    rack.free_job_slots(jid)
+    jobs = [j for j in jobs if j["id"] != jid]
+    save_config()
+    await broadcast("rack", rack.to_dict())
+    return {"ok": True}
+
+@app.post("/api/queue/start")
+async def queue_start():
+    if not queue_mgr.start(): raise HTTPException(409, "Nothing to start")
+    return queue_mgr.to_dict()
+
+@app.post("/api/queue/pause")
+async def queue_pause():
+    if not queue_mgr.pause(): raise HTTPException(409, "Queue is not running")
+    return queue_mgr.to_dict()
+
+@app.post("/api/queue/resume")
+async def queue_resume():
+    if not queue_mgr.resume(): raise HTTPException(409, "Queue is not paused")
+    return queue_mgr.to_dict()
+
+@app.post("/api/queue/stop")
+async def queue_stop():
+    job = queue_mgr.stop()
+    save_config()
+    await broadcast("rack", rack.to_dict())
+    await broadcast("queue", queue_mgr.to_dict())
+    return queue_mgr.to_dict()
+
+@app.post("/api/queue/retry")
+async def queue_retry():
+    if not queue_mgr.retry(): raise HTTPException(409, "Queue is not in error state")
+    return queue_mgr.to_dict()
+
+@app.post("/api/queue/skip")
+async def queue_skip():
+    if not queue_mgr.skip(): raise HTTPException(409, "Queue is not in error state")
+    save_config()
+    await broadcast("rack", rack.to_dict())
+    return queue_mgr.to_dict()
+
+@app.post("/api/queue/abort")
+async def queue_abort():
+    if not queue_mgr.abort(): raise HTTPException(409, "Queue is not in error state")
+    save_config()
+    await broadcast("rack", rack.to_dict())
+    return queue_mgr.to_dict()
 
 # ── Rack routes ────────────────────────────────────────────────────────────────
 @app.get("/api/rack")
@@ -690,7 +1257,33 @@ async def set_rack_config(cfg: RackConfig):
 async def update_slot(req: SlotUpdate):
     if req.slot_index < 0 or req.slot_index >= rack.num_slots:
         raise HTTPException(400, "Invalid slot index")
-    rack.slots[req.slot_index] = {"state": req.state, "label": req.label, "note": req.note}
+    rack.slots[req.slot_index] = {"state": req.state, "label": req.label,
+                                   "note": req.note, "job_id": None}
+    save_config()
+    await broadcast("rack", rack.to_dict())
+    return rack.to_dict()
+
+@app.post("/api/rack/slot/{slot}/clear_print")
+async def clear_print_slot(slot: int):
+    """User confirms the finished print + plate were physically removed.
+    Frees this slot and any slots blocked by its print overlay."""
+    if slot < 1 or slot > rack.num_slots: raise HTTPException(400, "Invalid slot")
+    idx = slot - 1
+    if rack.slots[idx]["state"] != "printed":
+        raise HTTPException(409, "Slot has no finished print")
+    rack.clear_print(idx)
+    save_config()
+    await broadcast("rack", rack.to_dict())
+    return rack.to_dict()
+
+@app.post("/api/rack/slot/{slot}/free_grab")
+async def free_grab_slot(slot: int):
+    """Manually free a grab_reserved slot — the plate was already picked up."""
+    if slot < 1 or slot > rack.num_slots: raise HTTPException(400, "Invalid slot")
+    idx = slot - 1
+    if rack.slots[idx]["state"] != "grab_reserved":
+        raise HTTPException(409, "Slot is not reserved for grabbing")
+    rack.free_grab_slot(idx)
     save_config()
     await broadcast("rack", rack.to_dict())
     return rack.to_dict()
@@ -703,12 +1296,50 @@ async def _run_klipper(macro: str):
         return {"ok": r.status_code == 200, "macro": macro}
     except Exception as e: raise HTTPException(503, f"Moonraker: {e}")
 
+COREXY_MODELS = {
+    "X1C","P1S","P1P","A1","A1 Mini","P2S",   # Bambu Lab
+    "Core One",                                  # Prusa Core One
+    "K1C","K1","K1 Max",                         # Creality
+    "Kobra S1",                                  # Anycubic
+    "Centauri Carbon","Centauri",                # Elegoo
+    "AD5X","Adventurer 5M Pro","Adventurer 5M",  # FlashForge
+    "Generic Klipper",
+}
+CARTESIAN_YMAX = {"MK3S":210,"MK3":210,"MK4S":250,"MK4":250}
+
+async def _send_printer_gcode(pid: str, cmd: str) -> bool:
+    """Send a gcode command to the printer itself (not Klipper/Moonraker)."""
+    p = printers.get(pid)
+    if not p: return False
+    if p.protocol == "mqtt_ftp":
+        return await bambu_publish(pid,
+            {"print":{"command":"gcode_line","sequence_id":_seq(),"param":cmd}})
+    else:
+        return await moonraker_gcode(pid, cmd)
+
 @app.post("/api/ottoeject/eject/{pid}")
 async def ej_eject(pid: str):
+    """Full eject sequence:
+    1. Move printer axis to safe position (sent to printer directly)
+    2. M400 — wait for move (sent to printer)
+    3. EJECT_FROM_<PRINTER> (sent to Klipper via Moonraker)
+    """
     p = printers.get(pid)
     if not p: raise HTTPException(404)
     m = get_eject_macro(p.brand, p.model)
     if not m: raise HTTPException(422, f"No eject macro for {p.brand} {p.model}")
+
+    # Step 1+2: move printer to safe position
+    if p.model in COREXY_MODELS:
+        move_cmd = "G1 Z200 F3000"
+    else:
+        ymax = CARTESIAN_YMAX.get(p.model, 210)
+        move_cmd = f"G1 Y{ymax} F6000"
+
+    await _send_printer_gcode(pid, move_cmd)
+    await _send_printer_gcode(pid, "M400")
+
+    # Step 3: eject via Klipper macro
     return await _run_klipper(m)
 
 @app.post("/api/ottoeject/load/{pid}")
@@ -734,7 +1365,7 @@ async def grab_slot(slot: int):
     result = await _run_klipper(f"GRAB_FROM_SLOT_{slot}")
     if result.get("ok"):
         idx = slot - 1
-        rack.slots[idx] = {"state": "empty", "label": "", "note": ""}
+        rack.slots[idx] = {"state": "empty", "label": "", "note": "", "job_id": None}
         save_config(); await broadcast("rack", rack.to_dict())
     return result
 
@@ -745,7 +1376,7 @@ async def store_slot(slot: int):
     result = await _run_klipper(f"STORE_TO_SLOT_{slot}")
     if result.get("ok"):
         idx = slot - 1
-        rack.slots[idx] = {"state": "ready", "label": "Platte drin", "note": ""}
+        rack.slots[idx] = {"state": "ready", "label": "Plate loaded", "note": "", "job_id": None}
         save_config(); await broadcast("rack", rack.to_dict())
     return result
 
@@ -768,6 +1399,8 @@ async def ws_ep(ws: WebSocket):
     await ws.send_text(json.dumps({"event":"init","data":{
         "printers": [p.to_dict() for p in printers.values()],
         "rack": rack.to_dict(),
+        "queue": queue_mgr.to_dict(),
+        "jobs": jobs,
     }}))
     try:
         while True: await ws.receive_text()
