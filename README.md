@@ -1,10 +1,14 @@
+<p align="center">
+  <img src="docs/logo.png" alt="OttoBridge" width="600">
+</p>
+
 # OttoBridge
 
-**Lightweight web-based orchestrator for 3D print farms with OttoEject rack automation.**
+Lightweight web orchestrator for 3D print farms with OttoEject rack automation. Runs on a Raspberry Pi Zero 2 W alongside Klipper + Moonraker (~30 MB RAM). No Electron, no Node.js, no build step.
 
-Runs on a Raspberry Pi Zero 2 W alongside Klipper + Moonraker. Replaces OTTOengine with a lean Python/FastAPI backend (~30 MB RAM) and a vanilla JS frontend — no Electron, no Node.js, no build step.
+📖 **First time? → [INSTALL.md](INSTALL.md)**
 
-![OttoBridge Dashboard](https://raw.githubusercontent.com/repraph/OttoBridge/main/docs/screenshot.png)
+OttoBridge is inspired by and built for the [OttoEject](https://www.ottomat3d.com/) hardware ecosystem by [OTTOMAT3D](https://www.ottomat3d.com/) — a 6-slot automated storage rack and pick-and-place system for 3D printers. OttoBridge is an independent, community-built orchestrator and is not affiliated with or endorsed by OTTOMAT3D.
 
 ---
 
@@ -15,209 +19,96 @@ Runs on a Raspberry Pi Zero 2 W alongside Klipper + Moonraker. Replaces OTTOengi
 | Bambu Lab | X1C, P1S, P1P, A1, A1 Mini, P2S | MQTT + FTPS |
 | Prusa | MK3S, MK3, MK4S, MK4, Core One | PrusaLink HTTP |
 | Creality | K1C, K1, K1 Max | HTTP |
-| Anycubic | Kobra S1, Kobra S1 Max | Moonraker |
+| Anycubic | Kobra S1 | Moonraker |
 | Elegoo | Centauri Carbon, Centauri | WebSocket |
 | FlashForge | AD5X, Adventurer 5M Pro, 5M | HTTP |
 | Generic | Any Klipper/Moonraker printer | Moonraker |
+
+## Multi-Material Systems
+
+| Printer | System | Notes |
+|---|---|---|
+| Bambu X1C / P1S / P2S / A1 | AMS / AMS Lite | Full support via MQTT `ams_mapping` (always 4 elements) |
+| Anycubic Kobra S1 | ACE Pro | Tool changes in gcode, handled by Klipper [ACEPRO driver](https://github.com/Kobra-S1/ACEPRO) |
+| Elegoo Centauri | CANVAS | Tool changes in gcode, Klipper-based |
+| Creality K1C | CFS | Tool changes in gcode, Klipper-based |
+| Prusa MK4S | MMU3 | Tool changes in gcode, PrusaLink starts file |
 
 ---
 
 ## Features
 
-- **Dashboard** — live printer status, temperatures, progress, AMS tray info
-- **OttoEject** — one-click eject, load and door-close macros for all supported printers
-- **Rack management** — up to 6 slots, SVG visualisation, slot states (ready / grab-reserved / park-reserved / printed)
-- **Gcode analysis** — drag-and-drop `.gcode` or `.3mf`, auto-detects print height, calculates required slots
-- **Job queue** — assign grab slot + park slot per job; slots locked only when queued, not on upload
-- **Smart slot reuse** — if a plate is grabbed from Slot N before printing, Slot N is immediately free to park the finished print
-- **Mainsail integration** — appears as external link in Mainsail sidebar via `moonraker.conf`
-- **WebSocket live updates** — all tabs update in real time
-- **Multi-printer** — manage multiple printers simultaneously
-
----
-
-## Hardware Requirements
-
-- Raspberry Pi Zero 2 W (512 MB RAM)
-- Klipper + Moonraker already running
-- OttoEject rack hardware (aluminum profile + bracket assembly)
-
-### RAM footprint
-
-| Service | RAM |
-|---|---|
-| Klipper | ~40 MB |
-| Moonraker | ~60 MB |
-| OttoBridge | ~30 MB |
-| **Total** | **~130 MB** ✓ |
+- Dashboard — live status, temperatures, progress
+- Printer tab — connect any supported printer, OttoEject calibration shortcuts
+- OttoEject tab — eject, load, door-close macros; full eject sequence with Z/Y move sent to printer first
+- Rack tab — up to 6 slots, SVG visualisation, collision detection, print overlay with filename + height
+- Jobs tab — drag-and-drop gcode analysis, grab/park slot assignment, slots locked only when queued
+- Queue — automated sequence: grab → load → print → wait → Z200 → eject → store; pause on error, retry from print start
+- Mainsail integration via `moonraker.conf`
+- WebSocket live updates
 
 ---
 
 ## Installation
 
 ```bash
-# Copy files to Pi
 scp -r OttoBridge/ pi@<pi-ip>:~/
-
-# On the Pi
-cd ~/OttoBridge
-bash install.sh
+ssh pi@<pi-ip>
+cd ~/OttoBridge && bash install.sh
 ```
 
-OttoBridge is now available at `http://<pi-ip>:8080`
+Open `http://<pi-ip>:8080` in your browser.
 
-### Manual install
-
-```bash
-python3 -m venv venv
-venv/bin/pip install -r requirements.txt
-venv/bin/uvicorn app:app --host 0.0.0.0 --port 8080 --workers 1
-```
+See [INSTALL.md](INSTALL.md) for detailed steps including Windows instructions and troubleshooting.
 
 ---
 
-## Klipper Macros Setup
+## Klipper Setup
 
-Copy the macro files to your Klipper config directory:
-
-```bash
-cp klipper_macros/rack_slots.cfg ~/printer_data/config/macros/
-```
-
-Add to your `printer.cfg`:
+No additional macros needed. `GRAB_FROM_SLOT_N` and `STORE_TO_SLOT_N` are already defined in `storage_calibration_variables.cfg`. Place all OttoEject cfg files in your Klipper config directory and add to `printer.cfg`:
 
 ```ini
-[include macros/rack_slots.cfg]
-[include macros/ottoeject_macros.cfg]
-[include macros/printer_calibration_variables.cfg]
-[include macros/storage_calibration_variables.cfg]
+[include ottoeject_macros.cfg]
+[include printer_calibration_variables.cfg]
+[include storage_calibration_variables.cfg]
+[include _printer_x1c.cfg]   # uncomment your printer
+```
 
-# Activate your printer — uncomment one:
-;[include macros/_printer_x1c.cfg]
-;[include macros/_printer_p1s.cfg]
-;[include macros/_printer_p1p.cfg]
-;[include macros/_printer_a1.cfg]
-;[include macros/_printer_k1c.cfg]
-;[include macros/_printer_kobra_s1.cfg]
-;[include macros/_printer_elegoo_cc.cfg]
-;[include macros/_printer_flashforge_ad5x.cfg]
+## Mainsail Sidebar
+
+Add a link to OttoBridge in Mainsail's sidebar via `.theme/navi.json` (see [INSTALL.md](INSTALL.md) for details):
+
+```json
+// ~/printer_data/config/.theme/navi.json
+[
+  { "title": "OttoBridge", "href": "http://localhost:8080", "target": "_blank", "position": 95 }
+]
 ```
 
 ---
 
-## Mainsail Integration
+## Eject Sequence
 
-Add to `moonraker.conf` to show OttoBridge as a sidebar link in Mainsail:
-
-```ini
-[application OttoBridge]
-type: adhoc
-website: http://localhost:8080
-```
-
-> Mainsail has no native plugin system. This is the recommended integration method — OttoBridge runs independently on port 8080.
-
----
-
-## Gcode Height Detection
-
-OttoBridge reads print height from slicer comments (fastest):
+OttoBridge sends the park move **to the printer** (via MQTT/PrusaLink/HTTP), then the eject macro to Klipper:
 
 ```
-;MAX_LAYER_Z:62.4        ← OrcaSlicer, BambuStudio
-; total height: 62.4     ← BambuStudio
-;LAYER_HEIGHT:62.4       ← PrusaSlicer
+1. G1 Z200 F3000   → printer  (CoreXY)
+   G1 Y[Ymax] F6000 → printer  (Cartesian: Prusa MK3/MK4)
+2. M400            → printer  (wait for move)
+3. EJECT_FROM_...  → Klipper  (macro)
+4. STORE_TO_SLOT_N → Klipper  (macro)
 ```
 
-Falls back to scanning all Z-moves if no comment is found. Supports `.gcode` and `.3mf`.
-
-**Slot calculation:** `slots_needed = ceil(print_height_mm / 55)`
-
-The 55 mm slot gap matches the default `global_slot_gap` (25 mm) + 30 mm offset from `_DO_SLOT_OPERATION` in `storage_calibration_variables.cfg`.
-
----
-
-## API
-
-```
-GET  /api/printers              → list all printers
-POST /api/printers              → add printer
-PUT  /api/printers/{id}         → update printer
-DELETE /api/printers/{id}       → remove printer
-
-GET  /api/rack                  → rack state
-PUT  /api/rack/config           → set slot count
-PUT  /api/rack/slot             → update slot state
-
-POST /api/print/start           → start print
-POST /api/print/pause           → pause
-POST /api/print/resume          → resume
-POST /api/print/stop            → stop
-POST /api/print/clear_error     → clear error
-
-POST /api/upload/{printer_id}   → upload + FTP transfer
-GET  /api/files                 → list uploaded files
-
-GET  /api/jobs                  → job queue
-POST /api/jobs                  → add job
-DELETE /api/jobs/{id}           → remove job
-
-POST /api/ottoeject/eject/{id}       → run eject macro
-POST /api/ottoeject/load/{id}        → run load macro
-POST /api/ottoeject/close_door/{id}  → run door macro
-POST /api/ottoeject/grab_slot/{n}    → GRAB_FROM_SLOT_N
-POST /api/ottoeject/store_slot/{n}   → STORE_TO_SLOT_N
-POST /api/ottoeject/macro            → run any macro
-
-WS   /ws                        → live state updates
-```
-
----
-
-## Environment Variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `MOONRAKER_URL` | `http://localhost:7125` | Moonraker address |
-| `LOG_LEVEL` | `INFO` | Set to `DEBUG` for MQTT details |
-
----
-
-## Project Structure
-
-```
-OttoBridge/
-├── app.py                  ← FastAPI backend
-├── requirements.txt
-├── install.sh
-├── ottobridge.service      ← systemd unit
-├── static/
-│   └── index.html          ← complete frontend (single file)
-├── klipper_macros/
-│   └── rack_slots.cfg      ← GRAB/STORE slot macros
-├── test_gcodes/            ← sample files for testing
-│   ├── phone_stand_15mm.gcode
-│   ├── cable_clip_38mm.gcode
-│   ├── vase_62mm.gcode
-│   ├── lamp_shade_118mm.gcode
-│   ├── voron_toolhead_165mm.gcode
-│   └── tall_column_340mm.gcode
-└── uploads/                ← auto-created, gitignored
-```
-
----
-
-## Correct Macro Names
-
-OTTOengine used incorrect macro names internally. OttoBridge uses the exact names from the `.cfg` files:
+## Macro Names
 
 | Printer | Eject | Load |
 |---|---|---|
 | Bambu X1C | `EJECT_FROM_BAMBULAB_X_ONE_C` | `LOAD_ONTO_BAMBULAB_X_ONE_C` |
-| Bambu P1S | `EJECT_FROM_BAMBULAB_P_ONE_S` | `LOAD_ONTO_BAMBULAB_P_ONE_S` |
+| Bambu P1S / P2S | `EJECT_FROM_BAMBULAB_P_ONE_S` | `LOAD_ONTO_BAMBULAB_P_ONE_S` |
 | Bambu P1P | `EJECT_FROM_BAMBULAB_P_ONE_P` | `LOAD_ONTO_BAMBULAB_P_ONE_P` |
-| Bambu A1 | `EJECT_FROM_BAMBULAB_A_ONE` | `LOAD_ONTO_BAMBULAB_A_ONE` |
-| Prusa MK4S | `EJECT_FROM_PRUSA_MK_FOUR_S` | `LOAD_ONTO_PRUSA_MK_FOUR_S` |
+| Bambu A1 / A1 Mini | `EJECT_FROM_BAMBULAB_A_ONE` | `LOAD_ONTO_BAMBULAB_A_ONE` |
+| Prusa MK3S / MK3 | `EJECT_FROM_PRUSA_MK_THREE_S` | `LOAD_ONTO_PRUSA_MK_THREE_S` |
+| Prusa MK4S / MK4 | `EJECT_FROM_PRUSA_MK_FOUR_S` | `LOAD_ONTO_PRUSA_MK_FOUR_S` |
 | Prusa Core One | `EJECT_FROM_PRUSA_CORE_ONE` | `LOAD_ONTO_PRUSA_CORE_ONE` |
 | Anycubic Kobra S1 | `EJECT_FROM_ANYCUBIC_KOBRA_S_ONE` | `LOAD_ONTO_ANYCUBIC_KOBRA_S_ONE` |
 | Elegoo Centauri | `EJECT_FROM_ELEGOO_CC` | `LOAD_ONTO_ELEGOO_CC` |
@@ -228,7 +119,6 @@ OTTOengine used incorrect macro names internally. OttoBridge uses the exact name
 
 ## License
 
-MIT License — Non-Commercial. Free for personal, educational, and community use.
-Commercial use requires written permission. See [LICENSE](LICENSE).
+MIT — Non-Commercial. Free for personal, educational, and community use. Commercial use requires written permission. See [LICENSE](LICENSE).
 
 Not affiliated with Bambu Lab, Prusa, Creality, Anycubic, Elegoo, or FlashForge.
