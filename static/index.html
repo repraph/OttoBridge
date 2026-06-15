@@ -141,7 +141,6 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
   </div>
   <nav class="sidebar-nav">
     <button class="active" onclick="switchTab('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Dashboard</button>
-    <button onclick="switchTab('printer')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="8" width="16" height="9" rx="1"/><path d="M8 8V4h8v4M8 17v3h8v-3"/><circle cx="16" cy="12" r="1"/></svg>Printer</button>
     <button onclick="switchTab('files')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h6l2 2h8v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4z"/></svg>Files</button>
     <button onclick="switchTab('jobs')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5h6M9 3v2M15 3v2M5 7h14v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7z"/><path d="M9 12h6M9 16h6"/></svg>Jobs</button>
     <button onclick="switchTab('eject')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h11M12 6l7 6-7 6"/><path d="M19 19v1"/></svg>OttoEject</button>
@@ -215,38 +214,6 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
 </div>
 
 <!-- PRINTER (connected printers list / CRUD) -->
-<div class="tab-pane" id="tab-printer">
-  <div class="sec-title">Connected Printers</div>
-  <div id="printer-list"></div>
-  <button class="btn btn-acc" style="margin-top:14px" onclick="openAddForm()">+ Add printer</button>
-  <div id="pform" style="display:none;margin-top:20px">
-    <div class="sec-title" id="pform-title">New Printer</div>
-    <div class="card">
-      <input type="hidden" id="pf-id">
-      <div class="g2">
-        <div>
-          <div class="field"><label>Name</label><input type="text" id="pf-name" placeholder="Farm X1C #1"></div>
-          <div class="field"><label>Brand</label><select id="pf-brand" onchange="onBrand('pf')"></select></div>
-          <div class="field"><label>Model</label><select id="pf-model"></select></div>
-          <div class="field"><label>IP Address</label><input type="text" id="pf-ip" placeholder="192.168.1.100"></div>
-        </div>
-        <div>
-          <div class="field" id="pf-code-w"><label>Access Code <span style="color:var(--muted)">(Bambu)</span></label><input type="password" id="pf-code" placeholder="LAN code"></div>
-          <div class="field" id="pf-serial-w"><label>Serial Number <span style="color:var(--muted)">(Bambu)</span></label><input type="text" id="pf-serial" placeholder="01S00A…"></div>
-          <div class="field" id="pf-apikey-w"><label>API Key <span style="color:var(--muted)">(Prusa)</span></label><input type="password" id="pf-apikey" placeholder="PrusaLink key"></div>
-          <div class="field" id="pf-sc-w"><label>Serial Code <span style="color:var(--muted)">(FlashForge)</span></label><input type="text" id="pf-sc" placeholder="FF serial"></div>
-          <div class="field" id="pf-cc-w"><label>Check Code <span style="color:var(--muted)">(FlashForge)</span></label><input type="password" id="pf-cc" placeholder="FF check"></div>
-        </div>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-acc" onclick="savePrinter()">Save &amp; Connect</button>
-        <button class="btn" onclick="closeForm()">Cancel</button>
-        <button class="btn btn-danger" id="pf-del" style="display:none" onclick="delPrinter()">Delete</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- FILES -->
 <div class="tab-pane" id="tab-files">
   <div class="sec-title">Upload</div>
@@ -270,11 +237,11 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
 <div class="tab-pane" id="tab-jobs">
 
   <!-- Queue control bar -->
-  <div style="display:flex;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--brd);margin-bottom:14px;flex-wrap:wrap">
-    <button class="btn btn-acc btn-sm" id="btn-q-start" onclick="queueStart()">▶ Start queue</button>
-    <button class="btn btn-yel btn-sm" id="btn-q-pause" onclick="queuePause()" style="display:none">⏸ Pause</button>
-    <button class="btn btn-blu btn-sm" id="btn-q-resume" onclick="queueResume()" style="display:none">▶ Resume</button>
-    <button class="btn btn-danger btn-sm" id="btn-q-stop" onclick="queueStop()" style="display:none">⏹ Stop</button>
+  <div style="display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--brd);margin-bottom:14px;flex-wrap:wrap">
+    <button class="btn btn-acc" id="btn-q-start" onclick="queueStart()" style="padding:12px 28px;font-size:15px;font-weight:700">▶ Start queue</button>
+    <button class="btn btn-yel" id="btn-q-pause" onclick="queuePause()" style="display:none;padding:10px 22px;font-size:14px">⏸ Pause</button>
+    <button class="btn btn-blu" id="btn-q-resume" onclick="queueResume()" style="display:none;padding:10px 22px;font-size:14px">▶ Resume</button>
+    <button class="btn btn-danger" id="btn-q-stop" onclick="queueStop()" style="display:none;padding:10px 22px;font-size:14px">⏹ Stop</button>
   </div>
 
   <div class="queue-counters" id="queue-counters"></div>
@@ -498,25 +465,34 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
 
 <!-- SETTINGS -->
 <div class="tab-pane" id="tab-settings">
-  <div class="sec-title">Add Printer</div>
-  <div class="card">
-    <div class="g2">
-      <div>
-        <div class="field"><label>Name</label><input type="text" id="cfg-name" placeholder="Farm X1C #1"></div>
-        <div class="field"><label>Brand</label><select id="cfg-brand" onchange="onBrand('cfg')"></select></div>
-        <div class="field"><label>Model</label><select id="cfg-model"></select></div>
-        <div class="field"><label>IP Address</label><input type="text" id="cfg-ip" placeholder="192.168.1.100"></div>
-      </div>
-      <div>
-        <div class="field"><label>Access Code <span style="color:var(--muted)">(Bambu)</span></label><input type="password" id="cfg-code" placeholder="LAN code"></div>
-        <div class="field"><label>Serial Number <span style="color:var(--muted)">(Bambu)</span></label><input type="text" id="cfg-serial" placeholder="01S00A…"></div>
-        <div class="field"><label>API Key <span style="color:var(--muted)">(Prusa)</span></label><input type="password" id="cfg-apikey" placeholder="PrusaLink key"></div>
-        <div class="field"><label>Serial + Check Code <span style="color:var(--muted)">(FlashForge)</span></label>
-          <div style="display:flex;gap:7px"><input type="text" id="cfg-sc" placeholder="Serial"><input type="password" id="cfg-cc" placeholder="Check"></div>
+  <div class="sec-title">Connected Printers</div>
+  <div id="printer-list"></div>
+  <button class="btn btn-acc" style="margin-top:14px" onclick="openAddForm()">+ Add printer</button>
+  <div id="pform" style="display:none;margin-top:20px">
+    <div class="sec-title" id="pform-title">New Printer</div>
+    <div class="card">
+      <input type="hidden" id="pf-id">
+      <div class="g2">
+        <div>
+          <div class="field"><label>Name</label><input type="text" id="pf-name" placeholder="Farm X1C #1"></div>
+          <div class="field"><label>Brand</label><select id="pf-brand" onchange="onBrand('pf')"></select></div>
+          <div class="field"><label>Model</label><select id="pf-model"></select></div>
+          <div class="field"><label>IP Address</label><input type="text" id="pf-ip" placeholder="192.168.1.100"></div>
+        </div>
+        <div>
+          <div class="field" id="pf-code-w"><label>Access Code <span style="color:var(--muted)">(Bambu)</span></label><input type="password" id="pf-code" placeholder="LAN code"></div>
+          <div class="field" id="pf-serial-w"><label>Serial Number <span style="color:var(--muted)">(Bambu)</span></label><input type="text" id="pf-serial" placeholder="01S00A…"></div>
+          <div class="field" id="pf-apikey-w"><label>API Key <span style="color:var(--muted)">(Prusa)</span></label><input type="password" id="pf-apikey" placeholder="PrusaLink key"></div>
+          <div class="field" id="pf-sc-w"><label>Serial Code <span style="color:var(--muted)">(FlashForge)</span></label><input type="text" id="pf-sc" placeholder="FF serial"></div>
+          <div class="field" id="pf-cc-w"><label>Check Code <span style="color:var(--muted)">(FlashForge)</span></label><input type="password" id="pf-cc" placeholder="FF check"></div>
         </div>
       </div>
+      <div class="btn-row">
+        <button class="btn btn-acc" onclick="savePrinter()">Save &amp; Connect</button>
+        <button class="btn" onclick="closeForm()">Cancel</button>
+        <button class="btn btn-danger" id="pf-del" style="display:none" onclick="delPrinter()">Delete</button>
+      </div>
     </div>
-    <div class="btn-row"><button class="btn btn-acc" onclick="addFromSettings()">Add &amp; Connect</button></div>
   </div>
   <hr class="divider">
   <div class="sec-title">OttoEject Calibration</div>
@@ -563,7 +539,7 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
 
 <script>
 const S={};let dashPid=null,brands={},ws,wsT;
-const TAB_NAMES=['dashboard','printer','files','jobs','eject','rack','console','settings'];
+const TAB_NAMES=['dashboard','files','jobs','eject','rack','console','settings'];
 const MAX_SLOTS_SOFT=30, SLOT_GAP=55;
 
 let rackState={num_slots:6,slots:[],overlays:[],blocked:[]};
@@ -616,7 +592,7 @@ function connectWS(){
 }
 
 function populateBrandSelects(){
-  ['pf-brand','cfg-brand'].forEach(id=>{
+  ['pf-brand'].forEach(id=>{
     const s=document.getElementById(id);if(!s)return;
     s.innerHTML='<option value="">— select brand —</option>';
     for(const[k,v]of Object.entries(brands)){
@@ -758,7 +734,7 @@ function editPrinter(pid){
   document.getElementById('pform-title').textContent='Edit Printer';
   document.getElementById('pform').style.display='block';
   updateAuthFields();
-  switchTab('printer');
+  switchTab('settings');
 }
 
 async function savePrinter(){
@@ -780,15 +756,6 @@ async function delPrinter(){
 }
 
 function closeForm(){document.getElementById('pform').style.display='none';}
-
-async function addFromSettings(){
-  const body={name:v('cfg-name'),brand:v('cfg-brand'),model:v('cfg-model'),ip:v('cfg-ip'),
-    access_code:v('cfg-code'),serial:v('cfg-serial'),api_key:v('cfg-apikey'),
-    serial_code:v('cfg-sc'),check_code:v('cfg-cc')};
-  if(!body.name||!body.brand||!body.ip){toast('err','Name, brand and IP are required');return;}
-  const r=await api('POST','/api/printers',body);
-  if(r){S[r.id]=r;renderAll();toast('ok',`${r.name} added ✓`);if(!dashPid)selectDash(r.id);}
-}
 
 // FILES
 async function uploadFile(file){
@@ -1578,7 +1545,7 @@ function toast(type,msg){
   setTimeout(()=>t.remove(),4000);
 }
 
-const TAB_TITLES={dashboard:'Dashboard',printer:'Printer',files:'Files',jobs:'Jobs',eject:'OttoEject',rack:'Rack',console:'Console',settings:'Settings'};
+const TAB_TITLES={dashboard:'Dashboard',files:'Files',jobs:'Jobs',eject:'OttoEject',rack:'Rack',console:'Console',settings:'Settings'};
 
 function switchTab(name){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
