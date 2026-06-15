@@ -12,37 +12,36 @@ This guide walks you through installing OttoBridge on a Raspberry Pi Zero 2 W th
 
 ---
 
-## Step 1 — Download OttoBridge
-
-Download the latest `OttoBridge_repo.zip` from the [Releases page](https://github.com/repraph/OttoBridge/releases) and unzip it on your computer. You'll get a folder called `OttoBridge`.
-
----
-
-## Step 2 — Copy files to the Pi
-
-Open a terminal on your computer and run:
-
-```bash
-scp -r OttoBridge/ pi@<your-pi-ip>:~/
-```
-
-Replace `<your-pi-ip>` with your Pi's IP address (e.g. `192.168.1.50`). You can find it in your router or in Mainsail under the hostname.
-
-The default password for MainsailOS is `raspberry`.
-
-> **Windows users:** Use [WinSCP](https://winscp.net) to drag and drop the OttoBridge folder onto the Pi. Connect with SFTP, host = Pi IP, username = `pi`, password = `raspberry`.
-
----
-
-## Step 3 — Run the installer
+## Step 1 — Get OttoBridge onto the Pi
 
 SSH into your Pi:
 
 ```bash
-ssh pi@<your-pi-ip>
+ssh <user>@<your-pi-ip>
 ```
 
-Then run the installer:
+Replace `<user>` and `<your-pi-ip>` with your login (e.g. `pi@192.168.1.50`). You can find the IP in your router or in Mainsail under the hostname.
+
+Then clone the repository:
+
+```bash
+cd ~
+git clone https://github.com/repraph/OttoBridge.git
+```
+
+This creates a folder `~/OttoBridge` with everything needed.
+
+> **No internet access on the Pi / prefer manual copy?** Download `OttoBridge_repo.zip` from the [Releases page](https://github.com/repraph/OttoBridge/releases), unzip it on your computer, then copy it over:
+> ```bash
+> scp -r OttoBridge/ <user>@<your-pi-ip>:~/
+> ```
+> **Windows users:** Use [WinSCP](https://winscp.net) to drag and drop the OttoBridge folder onto the Pi via SFTP.
+
+---
+
+## Step 2 — Run the installer
+
+You should still be connected via SSH. Run the installer:
 
 ```bash
 cd ~/OttoBridge
@@ -65,11 +64,11 @@ When it's done, you'll see something like:
 
 ---
 
-## Step 4 — Add OttoBridge to Mainsail (do this now)
+## Step 3 — Add OttoBridge to Mainsail (do this now)
 
 Before going further, add OttoBridge as a link in Mainsail's sidebar so you can always find it.
 
-SSH into the Pi and create the theme folder if it doesn't exist yet:
+Create the theme folder if it doesn't exist yet:
 
 ```bash
 mkdir -p ~/printer_data/config/.theme
@@ -95,7 +94,7 @@ Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`). Reload Mainsail in your browser —
 
 ---
 
-## Step 5 — Open OttoBridge
+## Step 4 — Open OttoBridge
 
 Open a browser and go to:
 
@@ -107,7 +106,7 @@ You should see the OttoBridge dashboard.
 
 ---
 
-## Step 6 — Connect your printer
+## Step 5 — Connect your printer
 
 Go to the **Printer** tab and fill in your printer details:
 
@@ -132,7 +131,7 @@ Click **Connect**. The status dot turns green when the connection is successful.
 
 ---
 
-## Step 7 — Connect OttoEject (Moonraker)
+## Step 6 — Connect OttoEject (Moonraker)
 
 Go to the **OttoEject** tab and click **Connect**. OttoBridge connects to Moonraker on `http://localhost:7125` by default — this is already correct if OttoBridge runs on the same Pi as Klipper.
 
@@ -140,7 +139,7 @@ If Klipper runs on a different machine, change the Moonraker URL to `http://<kli
 
 ---
 
-## Step 8 — Calibrate OttoEject
+## Step 7 — Calibrate OttoEject
 
 Before using the rack for the first time:
 
@@ -151,7 +150,7 @@ Before using the rack for the first time:
 
 ---
 
-## Step 9 — Set up your rack slots
+## Step 8 — Set up your rack slots
 
 Go to the **Rack** tab. You'll see 6 slots (Slot 1 at the bottom). For each slot that has a print plate loaded:
 
@@ -161,7 +160,7 @@ This tells OttoBridge which slots have plates ready for printing.
 
 ---
 
-## Step 10 — Add your first print job
+## Step 9 — Add your first print job
 
 Go to the **Jobs** tab:
 
