@@ -81,7 +81,7 @@ Add a link to OttoBridge in Mainsail's sidebar via `.theme/navi.json` (see [INST
 ```json
 // ~/printer_data/config/.theme/navi.json
 [
-  { "title": "OttoBridge", "href": "http://localhost:8080", "target": "_blank", "position": 95 }
+  { "title": "OttoBridge", "href": "http://ottoeject.local:8080", "target": "_blank", "position": 95 }
 ]
 ```
 
