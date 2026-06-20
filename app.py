@@ -358,6 +358,7 @@ def save_config():
             "api_key": p.api_key, "serial_code": p.serial_code, "check_code": p.check_code,
         })
     cfg["rack"] = rack.to_dict()
+    cfg["jobs"] = jobs
     CONFIG_FILE.write_text(json.dumps(cfg, indent=2))
 
 # ── MQTT (Bambu) ───────────────────────────────────────────────────────────────
@@ -591,6 +592,15 @@ async def lifespan(app: FastAPI):
             s.setdefault("job_id", None)
             rack.slots[i] = s
     rack.overlays = rc.get("overlays", [])
+
+    global jobs
+    jobs = cfg.get("jobs", [])
+    # A job that was 'running' when the server stopped is now stale —
+    # the queue automation task no longer exists, so put it back to 'queued'
+    # so it can be safely retried (its rack reservation is untouched).
+    for j in jobs:
+        if j.get("status") == "running":
+            j["status"] = "queued"
     yield
     for t in mqtt_tasks.values():
         if not t.done(): t.cancel()
