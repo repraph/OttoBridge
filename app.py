@@ -231,9 +231,11 @@ class RackState:
                 if idx < self.num_slots: blocked.add(idx)
         return blocked
 
-    def check_park(self, bottom_slot: int, slots_needed: int) -> Optional[str]:
+    def check_park(self, bottom_slot: int, slots_needed: int, grab_slot: Optional[int] = None) -> Optional[str]:
         """Validate a park assignment. Returns an error string, or None if OK.
-        Slot 6 (last slot) is open-topped: prints can extend above it without limit."""
+        Slot 6 (last slot) is open-topped: prints can extend above it without limit.
+        A 'ready' slot (existing plate) is only a valid park target if it's the
+        same slot being grabbed from (pick up, print, store back in place)."""
         if bottom_slot < 0 or bottom_slot >= self.num_slots:
             return "Invalid slot"
         blocked = self.blocked_indices()
@@ -247,6 +249,8 @@ class RackState:
                 return f"Slot {idx+1} is blocked by another print"
             s = self.slots[idx]
             if k == 0:
+                if s["state"] == "ready" and idx != grab_slot:
+                    return f"Slot {idx+1} already has a plate"
                 if s["state"] not in ("empty", "ready", "grab_reserved"):
                     return f"Slot {idx+1} is not available"
             else:
@@ -647,11 +651,18 @@ async def add_printer(cfg: PrinterCfg):
 
 @app.put("/api/printers/{pid}")
 async def update_printer(pid: str, cfg: PrinterCfg):
+    """Update printer settings. Credential fields (access_code, api_key, check_code)
+    are only overwritten if a new non-empty value is provided — the edit form
+    intentionally leaves these blank to avoid re-displaying secrets, so an empty
+    value here means 'keep the existing stored credential', not 'clear it'."""
     if pid not in printers: raise HTTPException(404)
     p = printers[pid]
     p.name = cfg.name; p.brand = cfg.brand; p.model = cfg.model; p.ip = cfg.ip
-    p.access_code = cfg.access_code; p.serial = cfg.serial; p.api_key = cfg.api_key
-    p.serial_code = cfg.serial_code; p.check_code = cfg.check_code
+    if cfg.access_code: p.access_code = cfg.access_code
+    if cfg.serial: p.serial = cfg.serial
+    if cfg.api_key: p.api_key = cfg.api_key
+    if cfg.serial_code: p.serial_code = cfg.serial_code
+    if cfg.check_code: p.check_code = cfg.check_code
     save_config(); await start_printer_task(pid); return p.to_dict()
 
 @app.delete("/api/printers/{pid}")
@@ -1172,7 +1183,8 @@ async def add_job(req: StartPrint):
     if req.park_slot is None:
         raise HTTPException(400, "park_slot is required")
     bottom = req.park_slot - 1
-    err = rack.check_park(bottom, max(1, req.slots_needed))
+    grab_idx = (req.grab_slot - 1) if req.grab_slot is not None else None
+    err = rack.check_park(bottom, max(1, req.slots_needed), grab_idx)
     if err: raise HTTPException(409, err)
     if req.grab_slot is not None:
         gi = req.grab_slot - 1
