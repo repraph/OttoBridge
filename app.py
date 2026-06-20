@@ -601,6 +601,21 @@ async def lifespan(app: FastAPI):
     for j in jobs:
         if j.get("status") == "running":
             j["status"] = "queued"
+
+    # Auto-heal orphaned rack reservations: any overlay or slot referencing a
+    # job_id that no longer exists in `jobs` (e.g. from a server restart that
+    # happened before job persistence was added) is cleared automatically,
+    # instead of leaving a permanently stuck slot the user has to fix by hand.
+    valid_job_ids = {j["id"] for j in jobs}
+    orphaned_overlays = [o for o in rack.overlays if o.get("job_id") not in valid_job_ids]
+    if orphaned_overlays:
+        orphaned_ids = {o["job_id"] for o in orphaned_overlays}
+        rack.overlays = [o for o in rack.overlays if o.get("job_id") in valid_job_ids]
+        for s in rack.slots:
+            if s.get("job_id") in orphaned_ids:
+                s["state"] = "empty"; s["label"] = ""; s["note"] = ""; s["job_id"] = None
+        log.warning(f"Cleared {len(orphaned_overlays)} orphaned rack reservation(s) on startup: {orphaned_ids}")
+        save_config()
     yield
     for t in mqtt_tasks.values():
         if not t.done(): t.cancel()
