@@ -1094,6 +1094,7 @@ function checkPark(bottomIdx, slotsNeeded, allowGrabIdx){
     if(blocked.has(idx)) return `Slot ${idx+1} is blocked by another print`;
     const s=(rackState.slots||[])[idx]||{state:'empty'};
     if(k===0){
+      if(s.state==='ready' && idx!==allowGrabIdx) return `Slot ${idx+1} already has a plate`;
       if(!['empty','ready','grab_reserved'].includes(s.state) && idx!==allowGrabIdx) return `Slot ${idx+1} is not available`;
     }else{
       if(s.state!=='empty') return `Slot ${idx+1} is occupied`;
