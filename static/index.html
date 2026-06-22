@@ -25,6 +25,8 @@ body{background:var(--bg);color:var(--txt);font-family:var(--sans);font-size:14p
 .sidebar-nav button.active{color:var(--acc);border-left-color:var(--acc);background:rgba(163,230,53,.06)}
 .sidebar-nav button svg{flex-shrink:0;width:20px;height:20px}
 .sidebar-foot{padding:14px 20px;border-top:1px solid var(--brd);font-size:11px;color:var(--muted)}
+.lang-select{width:100%;background:var(--bg);border:1px solid var(--brd2);border-radius:2px;color:var(--txt);font-family:var(--sans);font-size:11px;padding:6px 8px;outline:none;margin-bottom:10px;cursor:pointer}
+.lang-select:focus{border-color:var(--acc)}
 
 /* ── Top bar + content ───────────────────────────────────────────────── */
 .content{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -137,18 +139,27 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
   </div>
   <div class="sidebar-status">
     <div class="hdr-host" id="hdr-host"></div>
-    <div class="pill"><div class="dot" id="conn-dot"></div><span id="conn-label">Connecting…</span></div>
+    <div class="pill"><div class="dot" id="conn-dot"></div><span id="conn-label" data-i18n="status.connecting">Connecting…</span></div>
   </div>
   <nav class="sidebar-nav">
-    <button class="active" onclick="switchTab('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Dashboard</button>
-    <button onclick="switchTab('files')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h6l2 2h8v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4z"/></svg>Files</button>
-    <button onclick="switchTab('jobs')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5h6M9 3v2M15 3v2M5 7h14v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7z"/><path d="M9 12h6M9 16h6"/></svg>Jobs</button>
+    <button class="active" onclick="switchTab('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span data-i18n="nav.dashboard">Dashboard</span></button>
+    <button onclick="switchTab('files')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h6l2 2h8v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4z"/></svg><span data-i18n="nav.files">Files</span></button>
+    <button onclick="switchTab('jobs')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5h6M9 3v2M15 3v2M5 7h14v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7z"/><path d="M9 12h6M9 16h6"/></svg><span data-i18n="nav.jobs">Jobs</span></button>
     <button onclick="switchTab('eject')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h11M12 6l7 6-7 6"/><path d="M19 19v1"/></svg>OttoEject</button>
-    <button onclick="switchTab('rack')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M4 8h16M4 13h16M4 18h16"/></svg>Rack</button>
-    <button onclick="switchTab('console')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5h16v14H4z"/><path d="M8 9l3 3-3 3M13 15h3"/></svg>Console</button>
-    <button onclick="switchTab('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.97 7.97 0 0 0 0-2l2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.7-1L15 3h-4l-.3 2.6a8 8 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a8 8 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a8 8 0 0 0 1.7 1L11 21h4l.3-2.6a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6z"/></svg>Settings</button>
+    <button onclick="switchTab('rack')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M4 8h16M4 13h16M4 18h16"/></svg><span data-i18n="nav.rack">Rack</span></button>
+    <button onclick="switchTab('console')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5h16v14H4z"/><path d="M8 9l3 3-3 3M13 15h3"/></svg><span data-i18n="nav.console">Console</span></button>
+    <button onclick="switchTab('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.97 7.97 0 0 0 0-2l2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.7-1L15 3h-4l-.3 2.6a8 8 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a8 8 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a8 8 0 0 0 1.7 1L11 21h4l.3-2.6a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6z"/></svg><span data-i18n="nav.settings">Settings</span></button>
   </nav>
-  <div class="sidebar-foot">OttoBridge · Print farm orchestration</div>
+  <div class="sidebar-foot">
+    <select class="lang-select" id="lang-select" onchange="setLang(this.value)">
+      <option value="en">English</option>
+      <option value="de">Deutsch</option>
+      <option value="fr">Français</option>
+      <option value="it">Italiano</option>
+      <option value="es">Español</option>
+    </select>
+    <div data-i18n="footer.tagline">OttoBridge · Print farm orchestration</div>
+  </div>
 </aside>
 <div class="content">
 <div class="topbar">
@@ -165,39 +176,39 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
 <div class="tab-pane active" id="tab-dashboard">
   <div id="dash-empty" style="display:none;text-align:center;padding:48px 24px;color:var(--muted)">
     <div style="font-size:32px;margin-bottom:12px">🖨</div>
-    <div style="font-size:14px;margin-bottom:8px;color:var(--txt)">No printer yet</div>
-    <button class="btn btn-acc" onclick="switchTab('settings')">Add printer</button>
+    <div style="font-size:14px;margin-bottom:8px;color:var(--txt)" data-i18n="dash.no_printer">No printer yet</div>
+    <button class="btn btn-acc" onclick="switchTab('settings')" data-i18n="dash.add_printer">Add printer</button>
   </div>
   <div id="dash-content">
     <div style="margin-bottom:14px">
       <select id="dash-sel" onchange="selectDash(this.value)" style="background:var(--surf);border:1px solid var(--brd2);border-radius:2px;color:var(--txt);font-family:var(--mono);font-size:11px;padding:6px 10px;outline:none;width:100%;max-width:320px"></select>
     </div>
     <div class="g4" style="margin-bottom:14px">
-      <div class="stat-tile"><div class="stat-label">Status</div><div class="stat-value" id="s-state" style="font-size:16px">—</div></div>
-      <div class="stat-tile"><div class="stat-label">Nozzle</div><div class="stat-value" id="s-nozzle">—<span class="stat-unit">°C</span></div></div>
-      <div class="stat-tile"><div class="stat-label">Bed</div><div class="stat-value" id="s-bed">—<span class="stat-unit">°C</span></div></div>
-      <div class="stat-tile"><div class="stat-label">Progress</div><div class="stat-value" id="s-pct">—<span class="stat-unit">%</span></div></div>
+      <div class="stat-tile"><div class="stat-label" data-i18n="dash.status">Status</div><div class="stat-value" id="s-state" style="font-size:16px">—</div></div>
+      <div class="stat-tile"><div class="stat-label" data-i18n="dash.nozzle">Nozzle</div><div class="stat-value" id="s-nozzle">—<span class="stat-unit">°C</span></div></div>
+      <div class="stat-tile"><div class="stat-label" data-i18n="dash.bed">Bed</div><div class="stat-value" id="s-bed">—<span class="stat-unit">°C</span></div></div>
+      <div class="stat-tile"><div class="stat-label" data-i18n="dash.progress">Progress</div><div class="stat-value" id="s-pct">—<span class="stat-unit">%</span></div></div>
     </div>
     <div class="g2" style="margin-bottom:14px">
       <div class="card">
-        <div class="card-title">Print Progress</div>
+        <div class="card-title" data-i18n="dash.print_progress">Print Progress</div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="s-filename">—</div>
         <div class="progress-wrap"><div class="progress-bar" id="s-bar"></div></div>
         <div class="progress-label"><span id="s-layers">—</span><span id="s-remaining">—</span></div>
         <div class="btn-row">
-          <button class="btn btn-green btn-sm" onclick="ctrl('resume')">▶ Resume</button>
-          <button class="btn btn-sm" onclick="ctrl('pause')">⏸ Pause</button>
-          <button class="btn btn-danger btn-sm" onclick="confirmStop()">⏹ Stop</button>
-          <button class="btn btn-sm" onclick="ctrl('clear_error')">✕ Clear error</button>
+          <button class="btn btn-green btn-sm" onclick="ctrl('resume')">▶ <span data-i18n="dash.resume">Resume</span></button>
+          <button class="btn btn-sm" onclick="ctrl('pause')">⏸ <span data-i18n="dash.pause">Pause</span></button>
+          <button class="btn btn-danger btn-sm" onclick="confirmStop()">⏹ <span data-i18n="dash.stop">Stop</span></button>
+          <button class="btn btn-sm" onclick="ctrl('clear_error')">✕ <span data-i18n="dash.clear_error">Clear error</span></button>
         </div>
       </div>
       <div class="card">
-        <div class="card-title">Temperatures</div>
-        <div class="temp-row"><span class="temp-name">Nozzle</span><span><span class="temp-val" id="t-nozzle">—</span><span class="temp-target" id="t-nozzle-tgt"></span></span></div>
-        <div class="temp-row"><span class="temp-name">Bed</span><span><span class="temp-val" id="t-bed">—</span><span class="temp-target" id="t-bed-tgt"></span></span></div>
+        <div class="card-title" data-i18n="dash.temperatures">Temperatures</div>
+        <div class="temp-row"><span class="temp-name" data-i18n="dash.nozzle">Nozzle</span><span><span class="temp-val" id="t-nozzle">—</span><span class="temp-target" id="t-nozzle-tgt"></span></span></div>
+        <div class="temp-row"><span class="temp-name" data-i18n="dash.bed">Bed</span><span><span class="temp-val" id="t-bed">—</span><span class="temp-target" id="t-bed-tgt"></span></span></div>
         <div class="btn-row">
-          <button class="btn btn-sm" onclick="quickGcodeD('M104 S0\nM140 S0')">❄ Cool down</button>
-          <button class="btn btn-sm" onclick="toast('info','Sync requested')">⟳ Sync</button>
+          <button class="btn btn-sm" onclick="quickGcodeD('M104 S0\nM140 S0')">❄ <span data-i18n="dash.cool_down">Cool down</span></button>
+          <button class="btn btn-sm" onclick="toast('info',t('toast.sync_requested'))">⟳ <span data-i18n="dash.sync">Sync</span></button>
         </div>
       </div>
     </div>
@@ -206,9 +217,9 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
       <div class="ams-grid" id="ams-trays"></div>
     </div>
     <div class="error-banner" id="error-card" style="display:none">
-      <div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);margin-bottom:6px">⚠ Print error</div>
+      <div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);margin-bottom:6px">⚠ <span data-i18n="dash.print_error">Print error</span></div>
       <div id="error-code" style="font-size:18px;font-weight:700;color:var(--red)"></div>
-      <div class="btn-row"><button class="btn btn-danger btn-sm" onclick="ctrl('clear_error')">Acknowledge error</button></div>
+      <div class="btn-row"><button class="btn btn-danger btn-sm" onclick="ctrl('clear_error')" data-i18n="dash.acknowledge_error">Acknowledge error</button></div>
     </div>
   </div>
 </div>
@@ -216,20 +227,20 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
 <!-- PRINTER (connected printers list / CRUD) -->
 <!-- FILES -->
 <div class="tab-pane" id="tab-files">
-  <div class="sec-title">Upload</div>
-  <div class="field" style="max-width:300px;margin-bottom:10px"><label>Transfer to printer</label><select id="upload-target"></select></div>
+  <div class="sec-title" data-i18n="files.upload">Upload</div>
+  <div class="field" style="max-width:300px;margin-bottom:10px"><label data-i18n="files.transfer_to_printer">Transfer to printer</label><select id="upload-target"></select></div>
   <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
     <input type="file" id="file-input" accept=".3mf,.gcode" onchange="uploadFile(this.files[0])">
     <div style="font-size:24px;margin-bottom:7px">↑</div>
-    <div>.3mf or .gcode — transferred directly to the printer</div>
-    <div style="margin-top:3px;font-size:9px;opacity:.5">Click or drop a file</div>
+    <div data-i18n="files.drop_hint">.3mf or .gcode — transferred directly to the printer</div>
+    <div style="margin-top:3px;font-size:9px;opacity:.5" data-i18n="files.click_or_drop">Click or drop a file</div>
   </div>
   <div id="upload-prog" style="display:none;margin-top:8px">
     <div class="progress-wrap"><div class="progress-bar" style="width:100%;animation:pulse 1s infinite"></div></div>
-    <div style="font-size:10px;color:var(--muted);margin-top:4px" id="upload-lbl">Uploading…</div>
+    <div style="font-size:10px;color:var(--muted);margin-top:4px" id="upload-lbl" data-i18n="files.uploading">Uploading…</div>
   </div>
   <hr class="divider">
-  <div class="sec-title">Stored Files</div>
+  <div class="sec-title" data-i18n="files.stored_files">Stored Files</div>
   <ul id="file-list" style="list-style:none"></ul>
 </div>
 
@@ -238,33 +249,33 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
 
   <!-- Queue control bar -->
   <div style="display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--brd);margin-bottom:14px;flex-wrap:wrap">
-    <button class="btn btn-acc" id="btn-q-start" onclick="queueStart()" style="padding:12px 28px;font-size:15px;font-weight:700">▶ Start queue</button>
-    <button class="btn btn-yel" id="btn-q-pause" onclick="queuePause()" style="display:none;padding:10px 22px;font-size:14px">⏸ Pause</button>
-    <button class="btn btn-blu" id="btn-q-resume" onclick="queueResume()" style="display:none;padding:10px 22px;font-size:14px">▶ Resume</button>
-    <button class="btn btn-danger" id="btn-q-stop" onclick="queueStop()" style="display:none;padding:10px 22px;font-size:14px">⏹ Stop</button>
+    <button class="btn btn-acc" id="btn-q-start" onclick="queueStart()" style="padding:12px 28px;font-size:15px;font-weight:700">▶ <span data-i18n="jobs.start_queue">Start queue</span></button>
+    <button class="btn btn-yel" id="btn-q-pause" onclick="queuePause()" style="display:none;padding:10px 22px;font-size:14px">⏸ <span data-i18n="dash.pause">Pause</span></button>
+    <button class="btn btn-blu" id="btn-q-resume" onclick="queueResume()" style="display:none;padding:10px 22px;font-size:14px">▶ <span data-i18n="dash.resume">Resume</span></button>
+    <button class="btn btn-danger" id="btn-q-stop" onclick="queueStop()" style="display:none;padding:10px 22px;font-size:14px">⏹ <span data-i18n="dash.stop">Stop</span></button>
   </div>
 
   <div class="queue-counters" id="queue-counters"></div>
 
   <!-- Error banner -->
   <div class="error-banner" id="q-error-banner" style="display:none">
-    <div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);margin-bottom:6px">⚠ Queue paused — error in <span id="q-error-job"></span></div>
+    <div style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--red);margin-bottom:6px">⚠ <span data-i18n="jobs.queue_paused_error">Queue paused — error in</span> <span id="q-error-job"></span></div>
     <div style="font-size:11px;color:var(--red);margin-bottom:10px" id="q-error-msg"></div>
     <div class="btn-row" style="margin-top:0">
-      <button class="btn btn-blu btn-sm" onclick="queueRetry()">↺ Retry from print start</button>
-      <button class="btn btn-yel btn-sm" onclick="queueSkip()">→ Skip job</button>
-      <button class="btn btn-danger btn-sm" onclick="queueAbort()">✕ Abort &amp; free slots</button>
+      <button class="btn btn-blu btn-sm" onclick="queueRetry()">↺ <span data-i18n="jobs.retry_from_print_start">Retry from print start</span></button>
+      <button class="btn btn-yel btn-sm" onclick="queueSkip()">→ <span data-i18n="jobs.skip_job">Skip job</span></button>
+      <button class="btn btn-danger btn-sm" onclick="queueAbort()">✕ <span data-i18n="jobs.abort_free_slots">Abort &amp; free slots</span></button>
     </div>
   </div>
 
   <!-- Active job + step list -->
   <div id="active-job-wrap" style="display:none;margin-bottom:16px">
-    <div class="sec-title">Active Job</div>
+    <div class="sec-title" data-i18n="jobs.active_job">Active Job</div>
     <div class="job-card active">
       <div class="job-head">
         <span class="job-name" id="aj-name">—</span>
         <span style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="aj-height"></span>
-        <span class="badge badge-running" id="aj-badge">Running</span>
+        <span class="badge badge-running" id="aj-badge" data-i18n="jobs.running">Running</span>
       </div>
       <div class="job-foot">
         <span style="color:var(--blu)">⬆ <span id="aj-grab">—</span></span>
@@ -273,7 +284,7 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
       </div>
     </div>
     <div class="card" style="margin-top:8px">
-      <div class="card-title">Execution Steps</div>
+      <div class="card-title" data-i18n="jobs.execution_steps">Execution Steps</div>
       <div id="aj-steps"></div>
     </div>
   </div>
@@ -281,99 +292,99 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
   <div class="g2">
     <!-- Rack preview -->
     <div>
-      <div class="sec-title">Rack</div>
+      <div class="sec-title" data-i18n="nav.rack">Rack</div>
       <svg id="job-rack-svg" width="100%" height="280" viewBox="0 0 190 310" xmlns="http://www.w3.org/2000/svg" style="display:block"></svg>
       <div style="display:flex;flex-direction:column;gap:3px;font-size:9px;color:var(--muted);margin-top:8px">
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--grn);background:rgba(34,197,94,.12);flex-shrink:0"></div>Plate ready</div>
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--blu);background:rgba(59,130,246,.12);flex-shrink:0"></div>Being picked</div>
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--yel);background:rgba(234,179,8,.12);flex-shrink:0"></div>Park target</div>
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1.5px dashed var(--yel);flex-shrink:0"></div>Print (active)</div>
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1.5px dashed var(--pink);flex-shrink:0"></div>Print (done) — blocked</div>
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--pink);background:rgba(244,114,182,.12);flex-shrink:0"></div>Remove print</div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--grn);background:rgba(34,197,94,.12);flex-shrink:0"></div><span data-i18n="legend.plate_ready">Plate ready</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--blu);background:rgba(59,130,246,.12);flex-shrink:0"></div><span data-i18n="legend.being_picked">Being picked</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--yel);background:rgba(234,179,8,.12);flex-shrink:0"></div><span data-i18n="legend.park_target">Park target</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1.5px dashed var(--yel);flex-shrink:0"></div><span data-i18n="legend.print_active">Print (active)</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1.5px dashed var(--pink);flex-shrink:0"></div><span data-i18n="legend.print_done_blocked">Print (done) — blocked</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--pink);background:rgba(244,114,182,.12);flex-shrink:0"></div><span data-i18n="legend.remove_print">Remove print</span></div>
       </div>
     </div>
 
     <!-- New job form -->
     <div>
-      <div class="sec-title">New Job</div>
-      <div class="field"><label>Printer</label><select id="job-printer"></select></div>
+      <div class="sec-title" data-i18n="jobs.new_job">New Job</div>
+      <div class="field"><label data-i18n="jobs.printer">Printer</label><select id="job-printer"></select></div>
 
       <div class="drop-zone" id="job-dz" onclick="document.getElementById('job-gf').click()">
         <input type="file" id="job-gf" accept=".gcode,.3mf" onchange="analyzeUpload(this.files[0])">
         <div style="font-size:20px;margin-bottom:4px">↑</div>
-        <div>.gcode, .3mf or .gcode.3mf</div>
-        <div style="margin-top:3px;font-size:9px;opacity:.5">Drag &amp; drop or click — slots locked only when queued</div>
+        <div data-i18n="jobs.file_types">.gcode, .3mf or .gcode.3mf</div>
+        <div style="margin-top:3px;font-size:9px;opacity:.5" data-i18n="jobs.drop_hint">Drag &amp; drop or click — slots locked only when queued</div>
       </div>
       <div id="job-file-info" style="display:none;margin-bottom:10px"></div>
       <div id="job-file-err" style="display:none;color:var(--red);font-size:10px;margin-bottom:10px"></div>
 
-      <div class="field"><label>Bed Type</label>
+      <div class="field"><label data-i18n="jobs.bed_type">Bed Type</label>
         <select id="job-bed">
-          <option value="textured_plate">Textured Plate</option>
-          <option value="cool_plate">Cool Plate</option>
-          <option value="high_temp_plate">High Temp Plate</option>
-          <option value="engineering_plate">Engineering Plate</option>
+          <option value="textured_plate" data-i18n="jobs.bed.textured">Textured Plate</option>
+          <option value="cool_plate" data-i18n="jobs.bed.cool">Cool Plate</option>
+          <option value="high_temp_plate" data-i18n="jobs.bed.high_temp">High Temp Plate</option>
+          <option value="engineering_plate" data-i18n="jobs.bed.engineering">Engineering Plate</option>
         </select>
       </div>
 
-      <div class="toggle-row"><span class="toggle-label">Use AMS</span><label class="toggle"><input type="checkbox" id="job-ams"><div class="toggle-slider"></div></label></div>
-      <div class="toggle-row"><span class="toggle-label">Bed Leveling</span><label class="toggle"><input type="checkbox" id="job-level" checked><div class="toggle-slider"></div></label></div>
-      <div class="toggle-row"><span class="toggle-label">Flow Calibration</span><label class="toggle"><input type="checkbox" id="job-flow" checked><div class="toggle-slider"></div></label></div>
-      <div class="toggle-row"><span class="toggle-label">Vibration Calib.</span><label class="toggle"><input type="checkbox" id="job-vibr" checked><div class="toggle-slider"></div></label></div>
-      <div class="toggle-row"><span class="toggle-label">Lidar Inspection</span><label class="toggle"><input type="checkbox" id="job-lidar" checked><div class="toggle-slider"></div></label></div>
-      <div class="toggle-row"><span class="toggle-label">Timelapse</span><label class="toggle"><input type="checkbox" id="job-timelapse"><div class="toggle-slider"></div></label></div>
+      <div class="toggle-row"><span class="toggle-label" data-i18n="jobs.use_ams">Use AMS</span><label class="toggle"><input type="checkbox" id="job-ams"><div class="toggle-slider"></div></label></div>
+      <div class="toggle-row"><span class="toggle-label" data-i18n="jobs.bed_leveling">Bed Leveling</span><label class="toggle"><input type="checkbox" id="job-level" checked><div class="toggle-slider"></div></label></div>
+      <div class="toggle-row"><span class="toggle-label" data-i18n="jobs.flow_calibration">Flow Calibration</span><label class="toggle"><input type="checkbox" id="job-flow" checked><div class="toggle-slider"></div></label></div>
+      <div class="toggle-row"><span class="toggle-label" data-i18n="jobs.vibration_calib">Vibration Calib.</span><label class="toggle"><input type="checkbox" id="job-vibr" checked><div class="toggle-slider"></div></label></div>
+      <div class="toggle-row"><span class="toggle-label" data-i18n="jobs.lidar_inspection">Lidar Inspection</span><label class="toggle"><input type="checkbox" id="job-lidar" checked><div class="toggle-slider"></div></label></div>
+      <div class="toggle-row"><span class="toggle-label" data-i18n="jobs.timelapse">Timelapse</span><label class="toggle"><input type="checkbox" id="job-timelapse"><div class="toggle-slider"></div></label></div>
 
       <div class="divider"></div>
-      <div class="sec-title" style="font-size:10px;margin-bottom:10px">Plate Before Print</div>
+      <div class="sec-title" style="font-size:10px;margin-bottom:10px" data-i18n="jobs.plate_before_print">Plate Before Print</div>
       <div class="toggle-row">
-        <span class="toggle-label">Plate already in printer</span>
+        <span class="toggle-label" data-i18n="jobs.plate_already_in_printer">Plate already in printer</span>
         <label class="toggle"><input type="checkbox" id="job-plate-in-printer" checked onchange="onPlateModeChange()"><div class="toggle-slider"></div></label>
       </div>
       <div id="grab-slot-row" style="display:none;margin-top:10px">
         <div class="field">
-          <label>Pick plate from slot</label>
+          <label data-i18n="jobs.pick_plate_from_slot">Pick plate from slot</label>
           <select id="job-grab-slot" onchange="onGrabSlotChange()" style="max-width:200px">
-            <option value="">— select —</option>
+            <option value="" data-i18n="common.select">— select —</option>
           </select>
         </div>
       </div>
 
-      <div class="sec-title" style="font-size:10px;margin-top:14px;margin-bottom:10px">Park After Print</div>
+      <div class="sec-title" style="font-size:10px;margin-top:14px;margin-bottom:10px" data-i18n="jobs.park_after_print">Park After Print</div>
       <div class="field">
-        <label>Park slot (bottom slot)</label>
+        <label data-i18n="jobs.park_slot_bottom">Park slot (bottom slot)</label>
         <select id="job-park-slot" onchange="onParkSlotChange()" style="max-width:200px">
-          <option value="">— select —</option>
+          <option value="" data-i18n="common.select">— select —</option>
         </select>
       </div>
       <div id="job-park-warn" style="display:none;color:var(--red);font-size:10px;margin-bottom:8px"></div>
       <div id="job-slot-preview" style="display:none;margin-bottom:10px">
-        <div style="font-size:10px;color:var(--muted);margin-bottom:6px">Slots after queuing:</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:6px" data-i18n="jobs.slots_after_queuing">Slots after queuing:</div>
         <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap" id="job-slot-preview-inner"></div>
       </div>
 
       <div class="btn-row">
-        <button class="btn btn-acc" onclick="addQueue()">+ Queue — lock slots</button>
+        <button class="btn btn-acc" onclick="addQueue()">+ <span data-i18n="jobs.queue_lock_slots">Queue — lock slots</span></button>
       </div>
-      <div style="font-size:10px;color:var(--muted);margin-top:6px">Slots are locked only when queued.</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px" data-i18n="jobs.slots_locked_hint">Slots are locked only when queued.</div>
     </div>
   </div>
 
   <div class="divider"></div>
-  <div class="sec-title">Queue</div>
+  <div class="sec-title" data-i18n="jobs.queue">Queue</div>
   <div id="job-list"></div>
 </div>
 
 <!-- OTTOEJECT -->
 <div class="tab-pane" id="tab-eject">
-  <div class="sec-title">Select Printer</div>
+  <div class="sec-title" data-i18n="eject.select_printer">Select Printer</div>
   <div class="field" style="max-width:380px;margin-bottom:14px">
     <select id="eject-printer" onchange="onEjectPrinter()"></select>
   </div>
 
   <div class="card" style="margin-bottom:12px">
-    <div class="kv-row"><span class="kv-key">Eject from printer</span><span id="ej-eject-macro" style="color:var(--acc);font-size:10px">—</span></div>
-    <div class="kv-row"><span class="kv-key">Load onto printer</span><span id="ej-load-macro" style="color:var(--grn);font-size:10px">—</span></div>
-    <div class="kv-row"><span class="kv-key">Close printer door</span><span id="ej-door-macro" style="color:var(--muted);font-size:10px">—</span></div>
+    <div class="kv-row"><span class="kv-key" data-i18n="eject.eject_from_printer">Eject from printer</span><span id="ej-eject-macro" style="color:var(--acc);font-size:10px">—</span></div>
+    <div class="kv-row"><span class="kv-key" data-i18n="eject.load_onto_printer">Load onto printer</span><span id="ej-load-macro" style="color:var(--grn);font-size:10px">—</span></div>
+    <div class="kv-row"><span class="kv-key" data-i18n="eject.close_printer_door">Close printer door</span><span id="ej-door-macro" style="color:var(--muted);font-size:10px">—</span></div>
   </div>
 
   <div class="info-box" style="background:var(--bg);border:1px solid var(--brd);border-radius:3px;padding:10px 12px;margin-bottom:12px;font-size:10px;color:var(--muted);line-height:1.8;font-family:var(--mono)" id="ej-sequence"></div>
@@ -381,60 +392,60 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
   <div class="eject-grid">
     <div class="big-btn" onclick="runEject()">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="1.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-      <span class="big-btn-label">Eject print plate</span>
+      <span class="big-btn-label" data-i18n="eject.eject_print_plate">Eject print plate</span>
       <span class="big-btn-sub" id="ej-eject-lbl">—</span>
     </div>
     <div class="big-btn" onclick="runLoad()">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--grn)" stroke-width="1.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-      <span class="big-btn-label">Load print plate</span>
+      <span class="big-btn-label" data-i18n="eject.load_print_plate">Load print plate</span>
       <span class="big-btn-sub" id="ej-load-lbl">—</span>
     </div>
   </div>
 
   <div class="door-btn" id="door-btn" onclick="runDoor()" style="opacity:.4;pointer-events:none">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="1"/><path d="M12 12h1"/></svg>
-    <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Close printer door</span>
+    <span style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)" data-i18n="eject.close_printer_door">Close printer door</span>
     <span id="ej-door-lbl" style="font-size:9px;color:#333;margin-left:auto">—</span>
   </div>
 
   <div class="card">
-    <div class="card-title">Custom Macro</div>
+    <div class="card-title" data-i18n="eject.custom_macro">Custom Macro</div>
     <div style="display:flex;gap:7px">
       <input type="text" id="custom-macro" placeholder="MACRO_NAME" style="flex:1">
-      <button class="btn btn-acc btn-sm" onclick="runCustom()">Run</button>
+      <button class="btn btn-acc btn-sm" onclick="runCustom()" data-i18n="eject.run">Run</button>
     </div>
   </div>
 
   <hr class="divider">
-  <div class="sec-title">Klipper / Moonraker Status</div>
-  <div class="card" id="klipper-status"><div style="color:var(--muted);font-size:11px">Loading…</div></div>
+  <div class="sec-title" data-i18n="eject.klipper_status">Klipper / Moonraker Status</div>
+  <div class="card" id="klipper-status"><div style="color:var(--muted);font-size:11px" data-i18n="common.loading">Loading…</div></div>
 </div>
 
 <!-- RACK -->
 <div class="tab-pane" id="tab-rack">
   <div class="g2">
     <div>
-      <div class="sec-title">Rack — Slot 1 at bottom</div>
+      <div class="sec-title" data-i18n="rack.title">Rack — Slot 1 at bottom</div>
       <svg id="rack-svg" width="100%" height="340" viewBox="0 0 190 340" xmlns="http://www.w3.org/2000/svg" style="display:block;margin-bottom:12px"></svg>
       <div style="display:flex;flex-direction:column;gap:3px;font-size:9px;color:var(--muted)">
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--grn);background:rgba(34,197,94,.12);flex-shrink:0"></div>Plate ready</div>
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--blu);background:rgba(59,130,246,.12);flex-shrink:0"></div>Being picked</div>
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--yel);background:rgba(234,179,8,.12);flex-shrink:0"></div>Park slot</div>
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1.5px dashed var(--yel);flex-shrink:0"></div>Print (active)</div>
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1.5px dashed var(--pink);flex-shrink:0"></div>Print (done) — blocked</div>
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--pink);background:rgba(244,114,182,.12);flex-shrink:0"></div>Remove print</div>
-        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--brd2);flex-shrink:0"></div>Empty</div>
-        <div style="display:flex;align-items:center;gap:5px;color:var(--yel)"><span style="flex-shrink:0">⊘</span>Blocked (occupied by print above)</div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--grn);background:rgba(34,197,94,.12);flex-shrink:0"></div><span data-i18n="legend.plate_ready">Plate ready</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--blu);background:rgba(59,130,246,.12);flex-shrink:0"></div><span data-i18n="legend.being_picked">Being picked</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--yel);background:rgba(234,179,8,.12);flex-shrink:0"></div><span data-i18n="legend.park_target">Park slot</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1.5px dashed var(--yel);flex-shrink:0"></div><span data-i18n="legend.print_active">Print (active)</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1.5px dashed var(--pink);flex-shrink:0"></div><span data-i18n="legend.print_done_blocked">Print (done) — blocked</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--pink);background:rgba(244,114,182,.12);flex-shrink:0"></div><span data-i18n="legend.remove_print">Remove print</span></div>
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:2px;border:1px solid var(--brd2);flex-shrink:0"></div><span data-i18n="rack.empty">Empty</span></div>
+        <div style="display:flex;align-items:center;gap:5px;color:var(--yel)"><span style="flex-shrink:0">⊘</span><span data-i18n="rack.blocked_hint">Blocked (occupied by print above)</span></div>
       </div>
     </div>
     <div>
-      <div class="sec-title">Slots</div>
+      <div class="sec-title" data-i18n="rack.slots">Slots</div>
       <div id="rack-rows"></div>
       <div class="card" style="margin-top:14px">
-        <div class="card-title">Number of Slots</div>
+        <div class="card-title" data-i18n="rack.num_slots">Number of Slots</div>
         <div style="display:flex;align-items:center;gap:7px">
           <input type="number" id="slot-n" value="6" min="1" max="30" step="1" style="max-width:90px">
-          <button class="btn btn-sm" onclick="setSlotCount()">Apply</button>
+          <button class="btn btn-sm" onclick="setSlotCount()" data-i18n="rack.apply">Apply</button>
         </div>
       </div>
     </div>
@@ -443,67 +454,67 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
 
 <!-- CONSOLE -->
 <div class="tab-pane" id="tab-console">
-  <div class="sec-title">G-code Console</div>
-  <div class="field" style="max-width:300px;margin-bottom:10px"><label>Printer</label><select id="console-printer" onchange="updateCalibHint()"></select></div>
+  <div class="sec-title" data-i18n="console.gcode_console">G-code Console</div>
+  <div class="field" style="max-width:300px;margin-bottom:10px"><label data-i18n="jobs.printer">Printer</label><select id="console-printer" onchange="updateCalibHint()"></select></div>
   <div class="card">
     <div id="gcode-log"></div>
     <div style="display:flex;gap:7px">
       <input type="text" id="gcode-input" placeholder="M117 Hello" style="flex:1" onkeydown="if(event.key==='Enter')sendGcode()">
-      <button class="btn btn-acc" onclick="sendGcode()">Send</button>
+      <button class="btn btn-acc" onclick="sendGcode()" data-i18n="console.send">Send</button>
     </div>
     <div class="btn-row" style="margin-top:10px">
-      <button class="btn btn-sm" onclick="qg('M104 S0')">Nozzle off</button>
-      <button class="btn btn-sm" onclick="qg('M140 S0')">Bed off</button>
-      <button class="btn btn-sm" onclick="qg('G28')">Home</button>
-      <button class="btn btn-sm" onclick="qg('M84')">Motors off</button>
-      <button class="btn btn-sm" onclick="qg('M106 S255')">Fan max</button>
-      <button class="btn btn-sm" onclick="qg('M106 S0')">Fan off</button>
-      <button class="btn btn-sm" onclick="qg('PARK_OTTOEJECT')">Park OttoEject</button>
+      <button class="btn btn-sm" onclick="qg('M104 S0')" data-i18n="console.nozzle_off">Nozzle off</button>
+      <button class="btn btn-sm" onclick="qg('M140 S0')" data-i18n="console.bed_off">Bed off</button>
+      <button class="btn btn-sm" onclick="qg('G28')" data-i18n="console.home">Home</button>
+      <button class="btn btn-sm" onclick="qg('M84')" data-i18n="console.motors_off">Motors off</button>
+      <button class="btn btn-sm" onclick="qg('M106 S255')" data-i18n="console.fan_max">Fan max</button>
+      <button class="btn btn-sm" onclick="qg('M106 S0')" data-i18n="console.fan_off">Fan off</button>
+      <button class="btn btn-sm" onclick="qg('PARK_OTTOEJECT')" data-i18n="console.park_ottoeject">Park OttoEject</button>
     </div>
   </div>
 </div>
 
 <!-- SETTINGS -->
 <div class="tab-pane" id="tab-settings">
-  <div class="sec-title">Connected Printers</div>
+  <div class="sec-title" data-i18n="settings.connected_printers">Connected Printers</div>
   <div id="printer-list"></div>
-  <button class="btn btn-acc" style="margin-top:14px" onclick="openAddForm()">+ Add printer</button>
+  <button class="btn btn-acc" style="margin-top:14px" onclick="openAddForm()" data-i18n="settings.add_printer">+ Add printer</button>
   <div id="pform" style="display:none;margin-top:20px">
-    <div class="sec-title" id="pform-title">New Printer</div>
+    <div class="sec-title" id="pform-title" data-i18n="settings.new_printer">New Printer</div>
     <div class="card">
       <input type="hidden" id="pf-id">
       <div class="g2">
         <div>
-          <div class="field"><label>Name</label><input type="text" id="pf-name" placeholder="Farm X1C #1"></div>
-          <div class="field"><label>Brand</label><select id="pf-brand" onchange="onBrand('pf')"></select></div>
-          <div class="field"><label>Model</label><select id="pf-model"></select></div>
-          <div class="field"><label>IP Address</label><input type="text" id="pf-ip" placeholder="192.168.1.100"></div>
+          <div class="field"><label data-i18n="settings.name">Name</label><input type="text" id="pf-name" placeholder="Farm X1C #1"></div>
+          <div class="field"><label data-i18n="settings.brand">Brand</label><select id="pf-brand" onchange="onBrand('pf')"></select></div>
+          <div class="field"><label data-i18n="settings.model">Model</label><select id="pf-model"></select></div>
+          <div class="field"><label data-i18n="settings.ip_address">IP Address</label><input type="text" id="pf-ip" placeholder="192.168.1.100"></div>
         </div>
         <div>
-          <div class="field" id="pf-code-w"><label>Access Code <span style="color:var(--muted)">(Bambu)</span></label><input type="password" id="pf-code" placeholder="LAN code"></div>
-          <div class="field" id="pf-serial-w"><label>Serial Number <span style="color:var(--muted)">(Bambu)</span></label><input type="text" id="pf-serial" placeholder="01S00A…"></div>
-          <div class="field" id="pf-apikey-w"><label>API Key <span style="color:var(--muted)">(Prusa)</span></label><input type="password" id="pf-apikey" placeholder="PrusaLink key"></div>
-          <div class="field" id="pf-sc-w"><label>Serial Code <span style="color:var(--muted)">(FlashForge)</span></label><input type="text" id="pf-sc" placeholder="FF serial"></div>
-          <div class="field" id="pf-cc-w"><label>Check Code <span style="color:var(--muted)">(FlashForge)</span></label><input type="password" id="pf-cc" placeholder="FF check"></div>
+          <div class="field" id="pf-code-w"><label><span data-i18n="settings.access_code">Access Code</span> <span style="color:var(--muted)">(Bambu)</span></label><input type="password" id="pf-code" data-i18n-ph="settings.lan_code" placeholder="LAN code"></div>
+          <div class="field" id="pf-serial-w"><label><span data-i18n="settings.serial_number">Serial Number</span> <span style="color:var(--muted)">(Bambu)</span></label><input type="text" id="pf-serial" placeholder="01S00A…"></div>
+          <div class="field" id="pf-apikey-w"><label><span data-i18n="settings.api_key">API Key</span> <span style="color:var(--muted)">(Prusa)</span></label><input type="password" id="pf-apikey" data-i18n-ph="settings.prusalink_key" placeholder="PrusaLink key"></div>
+          <div class="field" id="pf-sc-w"><label><span data-i18n="settings.serial_code">Serial Code</span> <span style="color:var(--muted)">(FlashForge)</span></label><input type="text" id="pf-sc" data-i18n-ph="settings.ff_serial" placeholder="FF serial"></div>
+          <div class="field" id="pf-cc-w"><label><span data-i18n="settings.check_code">Check Code</span> <span style="color:var(--muted)">(FlashForge)</span></label><input type="password" id="pf-cc" data-i18n-ph="settings.ff_check" placeholder="FF check"></div>
         </div>
       </div>
       <div class="btn-row">
-        <button class="btn btn-acc" onclick="savePrinter()">Save &amp; Connect</button>
-        <button class="btn" onclick="closeForm()">Cancel</button>
-        <button class="btn btn-danger" id="pf-del" style="display:none" onclick="delPrinter()">Delete</button>
+        <button class="btn btn-acc" onclick="savePrinter()" data-i18n="settings.save_connect">Save &amp; Connect</button>
+        <button class="btn" onclick="closeForm()" data-i18n="settings.cancel">Cancel</button>
+        <button class="btn btn-danger" id="pf-del" style="display:none" onclick="delPrinter()" data-i18n="settings.delete">Delete</button>
       </div>
     </div>
   </div>
   <hr class="divider">
-  <div class="sec-title">OttoEject Calibration</div>
+  <div class="sec-title" data-i18n="settings.ottoeject_calibration">OttoEject Calibration</div>
   <div class="card">
-    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.7">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.7" data-i18n="settings.calibration_hint">
       Run these commands when setting up OttoEject for the first time or after a configuration change.
     </div>
     <div class="btn-row">
-      <button class="btn btn-sm" onclick="qg('OTTOEJECT_HOME')" title="G28 Y → G28 X → G28 Z → G1 Y10 X10 Z10">OttoEject Home</button>
-      <button class="btn btn-sm" id="calib-z-btn" onclick="sendCalibMove()" title="Move to starting position for OttoEject calibration">Z → 200mm</button>
-      <button class="btn btn-sm" onclick="qg('PARK_OTTOEJECT')">Park OttoEject</button>
+      <button class="btn btn-sm" onclick="qg('OTTOEJECT_HOME')" title="G28 Y → G28 X → G28 Z → G1 Y10 X10 Z10" data-i18n="settings.ottoeject_home">OttoEject Home</button>
+      <button class="btn btn-sm" id="calib-z-btn" onclick="sendCalibMove()" data-i18n-title="settings.move_to_calib_pos" title="Move to starting position for OttoEject calibration">Z → 200mm</button>
+      <button class="btn btn-sm" onclick="qg('PARK_OTTOEJECT')" data-i18n="console.park_ottoeject">Park OttoEject</button>
     </div>
     <div style="font-size:10px;color:var(--muted);margin-top:8px;font-family:var(--mono);line-height:1.8">
       OTTOEJECT_HOME: G28 Y → G28 X → G28 Z → G1 Y10 X10 Z10<br>
@@ -511,25 +522,25 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
     </div>
   </div>
   <hr class="divider">
-  <div class="sec-title">Mainsail Sidebar</div>
+  <div class="sec-title" data-i18n="settings.mainsail_sidebar">Mainsail Sidebar</div>
   <div class="card">
     <div style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
-      Add OttoBridge as a link in Mainsail's sidebar via <code style="background:var(--brd2);padding:1px 5px;border-radius:2px">.theme/navi.json</code>:
+      <span data-i18n="settings.mainsail_hint_1">Add OttoBridge as a link in Mainsail's sidebar via</span> <code style="background:var(--brd2);padding:1px 5px;border-radius:2px">.theme/navi.json</code>:
     </div>
     <div style="background:var(--bg);border:1px solid var(--brd2);border-radius:2px;padding:12px;font-family:var(--mono);font-size:11px;color:#808090;line-height:1.8" id="mainsail-snippet"></div>
-    <div class="btn-row"><button class="btn btn-sm" onclick="copySnippet()">Copy</button></div>
+    <div class="btn-row"><button class="btn btn-sm" onclick="copySnippet()" data-i18n="settings.copy">Copy</button></div>
     <div style="font-size:10px;color:var(--muted);margin-top:10px;line-height:1.7">
-      Save this as <code style="background:var(--brd2);padding:1px 4px;border-radius:2px">~/printer_data/config/.theme/navi.json</code> on the Pi, then reload Mainsail. See INSTALL.md for details.
+      <span data-i18n="settings.mainsail_hint_2">Save this as</span> <code style="background:var(--brd2);padding:1px 4px;border-radius:2px">~/printer_data/config/.theme/navi.json</code> <span data-i18n="settings.mainsail_hint_3">on the Pi, then reload Mainsail. See INSTALL.md for details.</span>
     </div>
   </div>
   <hr class="divider">
-  <div class="sec-title">Pi Zero 2 W — Resources</div>
+  <div class="sec-title" data-i18n="settings.pi_resources">Pi Zero 2 W — Resources</div>
   <div class="card">
     <div class="kv-row"><span class="kv-key">Klipper</span><span style="color:var(--muted)">~40 MB RAM</span></div>
     <div class="kv-row"><span class="kv-key">Moonraker</span><span style="color:var(--muted)">~60 MB RAM</span></div>
     <div class="kv-row"><span class="kv-key">OttoBridge</span><span style="color:var(--grn)">~30 MB RAM</span></div>
-    <div class="kv-row"><span class="kv-key">Reserve</span><span style="color:var(--grn)">~380 MB ✓</span></div>
-    <div class="kv-row"><span class="kv-key">CPU load (idle)</span><span style="color:var(--muted)">&lt; 5% per printer</span></div>
+    <div class="kv-row"><span class="kv-key" data-i18n="settings.reserve">Reserve</span><span style="color:var(--grn)">~380 MB ✓</span></div>
+    <div class="kv-row"><span class="kv-key" data-i18n="settings.cpu_load_idle">CPU load (idle)</span><span style="color:var(--muted)">&lt; 5% <span data-i18n="settings.per_printer">per printer</span></span></div>
   </div>
 </div>
 
@@ -538,6 +549,494 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
 <div id="toast-container"></div>
 
 <script>
+// ── I18N ─────────────────────────────────────────────────────────────────────
+const I18N = {
+  en: {
+    'nav.dashboard':'Dashboard','nav.files':'Files','nav.jobs':'Jobs','nav.rack':'Rack','nav.console':'Console','nav.settings':'Settings',
+    'footer.tagline':'OttoBridge · Print farm orchestration',
+    'status.connecting':'Connecting…',
+    'dash.no_printer':'No printer yet','dash.add_printer':'Add printer',
+    'dash.status':'Status','dash.nozzle':'Nozzle','dash.bed':'Bed','dash.progress':'Progress',
+    'dash.print_progress':'Print Progress','dash.resume':'Resume','dash.pause':'Pause','dash.stop':'Stop','dash.clear_error':'Clear error',
+    'dash.temperatures':'Temperatures','dash.cool_down':'Cool down','dash.sync':'Sync',
+    'dash.print_error':'Print error','dash.acknowledge_error':'Acknowledge error',
+    'rack.title':'Rack — Slot 1 at bottom','rack.empty':'Empty','rack.blocked_hint':'Blocked (occupied by print above)',
+    'rack.slots':'Slots','rack.num_slots':'Number of Slots','rack.apply':'Apply',
+    'console.gcode_console':'G-code Console','console.send':'Send',
+    'console.nozzle_off':'Nozzle off','console.bed_off':'Bed off','console.home':'Home','console.motors_off':'Motors off',
+    'console.fan_max':'Fan max','console.fan_off':'Fan off','console.park_ottoeject':'Park OttoEject',
+    'settings.connected_printers':'Connected Printers','settings.add_printer':'+ Add printer','settings.new_printer':'New Printer',
+    'settings.name':'Name','settings.brand':'Brand','settings.model':'Model','settings.ip_address':'IP Address',
+    'settings.access_code':'Access Code','settings.lan_code':'LAN code','settings.serial_number':'Serial Number',
+    'settings.api_key':'API Key','settings.prusalink_key':'PrusaLink key','settings.serial_code':'Serial Code',
+    'settings.ff_serial':'FF serial','settings.check_code':'Check Code','settings.ff_check':'FF check',
+    'settings.save_connect':'Save & Connect','settings.cancel':'Cancel','settings.delete':'Delete',
+    'settings.ottoeject_calibration':'OttoEject Calibration',
+    'settings.calibration_hint':'Run these commands when setting up OttoEject for the first time or after a configuration change.',
+    'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Move to starting position for OttoEject calibration',
+    'settings.mainsail_sidebar':'Mainsail Sidebar',
+    'settings.mainsail_hint_1':'Add OttoBridge as a link in Mainsail\'s sidebar via',
+    'settings.mainsail_hint_2':'Save this as','settings.mainsail_hint_3':'on the Pi, then reload Mainsail. See INSTALL.md for details.',
+    'settings.copy':'Copy','settings.pi_resources':'Pi Zero 2 W — Resources','settings.reserve':'Reserve','settings.cpu_load_idle':'CPU load (idle)',
+    'common.error':'Error',
+    'confirm.cancel_print':'Cancel the current print?','confirm.remove_printer':'Remove this printer?',
+    'dash.error_code':'Error code','dash.layer':'Layer','dash.min':'min','dash.no_active_print':'No active print',
+    'eject.moonraker_unreachable':'Moonraker not reachable','eject.not_available':'not available',
+    'eject.select_printer_hint':'Select a printer to see the eject sequence.',
+    'files.uploading_named':'Uploading: {name}…',
+    'jobs.badge_aborted':'Aborted','jobs.badge_done':'Done','jobs.badge_error':'Error','jobs.badge_running':'Running',
+    'jobs.badge_skipped':'Skipped','jobs.badge_waiting':'Waiting',
+    'jobs.err_invalid_slot':'Invalid slot','jobs.err_slot_blocked':'Slot {n} is blocked by another print',
+    'jobs.err_slot_has_plate':'Slot {n} already has a plate','jobs.err_slot_occupied':'Slot {n} is occupied',
+    'jobs.err_slot_unavailable':'Slot {n} is not available',
+    'jobs.freed_after_grab':'freed after grab','jobs.in_printer':'In printer','jobs.park_label':'park',
+    'jobs.pick_arrow':'pick →','jobs.pick_print_store_back':'pick → print → store back',
+    'jobs.queue_empty':'Queue is empty.','jobs.retry_from_print_hint':'retry from print',
+    'jobs.slot_n':'Slot {n}','jobs.slot_unit':'slot(s)',
+    'rack.blocked_short':'blocked','rack.insert_plate':'Insert plate','rack.job_running':'Job running',
+    'rack.locked':'Locked','rack.print_removed':'Print removed','rack.remove':'Remove',
+    'rack.state_empty':'Empty','rack.state_park':'Park slot','rack.state_picked':'Being picked',
+    'rack.state_printed':'Print finished','rack.state_ready':'Plate ready',
+    'settings.no_printers_yet':'No printers yet.',
+    'step.done_suffix':'done',
+    'toast.copied':'Copied','toast.deleted':'deleted','toast.door_sent':'Door macro sent',
+    'toast.drop_file_first':'Please drop a .gcode/.3mf file first','toast.eject_sent':'Eject sequence sent',
+    'toast.load_sent':'Load macro sent','toast.name_brand_ip_required':'Name, brand and IP are required',
+    'toast.printer_removed':'Printer removed','toast.queue_stopped':'Queue stopped — slots freed',
+    'toast.queued_slots_locked':'queued — slots locked','toast.saved':'saved',
+    'toast.select_park_slot':'Please select a park slot','toast.select_pick_slot':'Please select a pick slot',
+    'toast.select_printer':'Please select a printer','toast.slot_cleared':'Slot {n} cleared — blocked slots freed',
+    'toast.slot_plate_inserted':'Slot {n}: plate inserted','toast.upload_failed':'Upload failed','toast.uploaded':'uploaded',
+    'step.park1_upload':'Park OttoEject + upload file (parallel)',
+    'step.upload':'Upload file to printer',
+    'step.grab_parallel':'Open door + move to safe pos. + pick plate','step.load':'Wait idle, then load plate onto printer',
+    'step.park':'Park OttoEject','step.print':'Start print','step.wait_finish':'Wait for print to finish',
+    'step.move':'Move axis to safe pos.','step.wait_idle':'Wait for printer idle','step.eject':'Eject print plate (opens door)',
+    'step.store':'Store plate in rack',
+    'jobs.counter_waiting':'waiting','jobs.counter_done':'done','jobs.counter_aborted_skipped':'aborted/skipped','jobs.counter_total':'total',
+    'settings.per_printer':'per printer',
+    'toast.sync_requested':'Sync requested',
+    'common.loading':'Loading…','common.select':'— select —',
+    'files.upload':'Upload','files.transfer_to_printer':'Transfer to printer',
+    'files.drop_hint':'.3mf or .gcode — transferred directly to the printer','files.click_or_drop':'Click or drop a file',
+    'files.uploading':'Uploading…','files.stored_files':'Stored Files',
+    'jobs.start_queue':'Start queue','jobs.queue_paused_error':'Queue paused — error in',
+    'jobs.retry_from_print_start':'Retry from print start','jobs.skip_job':'Skip job','jobs.abort_free_slots':'Abort & free slots',
+    'jobs.active_job':'Active Job','jobs.running':'Running','jobs.execution_steps':'Execution Steps',
+    'jobs.new_job':'New Job','jobs.printer':'Printer','jobs.file_types':'.gcode, .3mf or .gcode.3mf',
+    'jobs.drop_hint':'Drag & drop or click — slots locked only when queued',
+    'jobs.bed_type':'Bed Type','jobs.bed.textured':'Textured Plate','jobs.bed.cool':'Cool Plate',
+    'jobs.bed.high_temp':'High Temp Plate','jobs.bed.engineering':'Engineering Plate',
+    'jobs.use_ams':'Use AMS','jobs.bed_leveling':'Bed Leveling','jobs.flow_calibration':'Flow Calibration',
+    'jobs.vibration_calib':'Vibration Calib.','jobs.lidar_inspection':'Lidar Inspection','jobs.timelapse':'Timelapse',
+    'jobs.plate_before_print':'Plate Before Print','jobs.plate_already_in_printer':'Plate already in printer',
+    'jobs.pick_plate_from_slot':'Pick plate from slot',
+    'jobs.park_after_print':'Park After Print','jobs.park_slot_bottom':'Park slot (bottom slot)',
+    'jobs.slots_after_queuing':'Slots after queuing:','jobs.queue_lock_slots':'Queue — lock slots',
+    'jobs.slots_locked_hint':'Slots are locked only when queued.','jobs.queue':'Queue',
+    'legend.plate_ready':'Plate ready','legend.being_picked':'Being picked','legend.park_target':'Park target',
+    'legend.print_active':'Print (active)','legend.print_done_blocked':'Print (done) — blocked','legend.remove_print':'Remove print',
+    'eject.select_printer':'Select Printer','eject.eject_from_printer':'Eject from printer','eject.load_onto_printer':'Load onto printer',
+    'eject.close_printer_door':'Close printer door','eject.eject_print_plate':'Eject print plate','eject.load_print_plate':'Load print plate',
+    'eject.custom_macro':'Custom Macro','eject.run':'Run','eject.klipper_status':'Klipper / Moonraker Status',
+  },
+  de: {
+    'nav.dashboard':'Übersicht','nav.files':'Dateien','nav.jobs':'Aufträge','nav.rack':'Regal','nav.console':'Konsole','nav.settings':'Einstellungen',
+    'footer.tagline':'OttoBridge · Druckfarm-Orchestrierung',
+    'status.connecting':'Verbinde…',
+    'dash.no_printer':'Noch kein Drucker','dash.add_printer':'Drucker hinzufügen',
+    'dash.status':'Status','dash.nozzle':'Düse','dash.bed':'Bett','dash.progress':'Fortschritt',
+    'dash.print_progress':'Druckfortschritt','dash.resume':'Fortsetzen','dash.pause':'Pausieren','dash.stop':'Stopp','dash.clear_error':'Fehler quittieren',
+    'dash.temperatures':'Temperaturen','dash.cool_down':'Abkühlen','dash.sync':'Sync',
+    'dash.print_error':'Druckfehler','dash.acknowledge_error':'Fehler quittieren',
+    'rack.title':'Regal — Slot 1 unten','rack.empty':'Leer','rack.blocked_hint':'Blockiert (durch Druck darüber belegt)',
+    'rack.slots':'Slots','rack.num_slots':'Anzahl Slots','rack.apply':'Übernehmen',
+    'console.gcode_console':'G-Code-Konsole','console.send':'Senden',
+    'console.nozzle_off':'Düse aus','console.bed_off':'Bett aus','console.home':'Homen','console.motors_off':'Motoren aus',
+    'console.fan_max':'Lüfter max','console.fan_off':'Lüfter aus','console.park_ottoeject':'OttoEject parken',
+    'settings.connected_printers':'Verbundene Drucker','settings.add_printer':'+ Drucker hinzufügen','settings.new_printer':'Neuer Drucker',
+    'settings.name':'Name','settings.brand':'Marke','settings.model':'Modell','settings.ip_address':'IP-Adresse',
+    'settings.access_code':'Zugangscode','settings.lan_code':'LAN-Code','settings.serial_number':'Seriennummer',
+    'settings.api_key':'API-Schlüssel','settings.prusalink_key':'PrusaLink-Schlüssel','settings.serial_code':'Seriencode',
+    'settings.ff_serial':'FF-Seriennummer','settings.check_code':'Prüfcode','settings.ff_check':'FF-Prüfcode',
+    'settings.save_connect':'Speichern & Verbinden','settings.cancel':'Abbrechen','settings.delete':'Löschen',
+    'settings.ottoeject_calibration':'OttoEject-Kalibrierung',
+    'settings.calibration_hint':'Diese Befehle bei der Ersteinrichtung von OttoEject oder nach einer Konfigurationsänderung ausführen.',
+    'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'In Startposition für OttoEject-Kalibrierung fahren',
+    'settings.mainsail_sidebar':'Mainsail-Seitenleiste',
+    'settings.mainsail_hint_1':'OttoBridge als Link in Mainsails Seitenleiste hinzufügen über',
+    'settings.mainsail_hint_2':'Speichere dies als','settings.mainsail_hint_3':'auf dem Pi, dann Mainsail neu laden. Details in INSTALL.md.',
+    'settings.copy':'Kopieren','settings.pi_resources':'Pi Zero 2 W — Ressourcen','settings.reserve':'Reserve','settings.cpu_load_idle':'CPU-Last (Leerlauf)',
+    'common.error':'Fehler',
+    'confirm.cancel_print':'Aktuellen Druck abbrechen?','confirm.remove_printer':'Diesen Drucker entfernen?',
+    'dash.error_code':'Fehlercode','dash.layer':'Schicht','dash.min':'Min','dash.no_active_print':'Kein aktiver Druck',
+    'eject.moonraker_unreachable':'Moonraker nicht erreichbar','eject.not_available':'nicht verfügbar',
+    'eject.select_printer_hint':'Drucker auswählen, um die Auswurf-Sequenz zu sehen.',
+    'files.uploading_named':'Wird hochgeladen: {name}…',
+    'jobs.badge_aborted':'Abgebrochen','jobs.badge_done':'Fertig','jobs.badge_error':'Fehler','jobs.badge_running':'Läuft',
+    'jobs.badge_skipped':'Übersprungen','jobs.badge_waiting':'Wartend',
+    'jobs.err_invalid_slot':'Ungültiger Slot','jobs.err_slot_blocked':'Slot {n} ist durch einen anderen Druck blockiert',
+    'jobs.err_slot_has_plate':'Slot {n} hat bereits eine Platte','jobs.err_slot_occupied':'Slot {n} ist belegt',
+    'jobs.err_slot_unavailable':'Slot {n} ist nicht verfügbar',
+    'jobs.freed_after_grab':'wird nach Entnahme frei','jobs.in_printer':'Im Drucker','jobs.park_label':'parken',
+    'jobs.pick_arrow':'entnehmen →','jobs.pick_print_store_back':'entnehmen → drucken → zurücklegen',
+    'jobs.queue_empty':'Warteschlange ist leer.','jobs.retry_from_print_hint':'erneut ab Druckstart',
+    'jobs.slot_n':'Slot {n}','jobs.slot_unit':'Slot(s)',
+    'rack.blocked_short':'blockiert','rack.insert_plate':'Platte einlegen','rack.job_running':'Auftrag läuft',
+    'rack.locked':'Gesperrt','rack.print_removed':'Druck entfernt','rack.remove':'Entfernen',
+    'rack.state_empty':'Leer','rack.state_park':'Park-Slot','rack.state_picked':'Wird entnommen',
+    'rack.state_printed':'Druck fertig','rack.state_ready':'Platte bereit',
+    'settings.no_printers_yet':'Noch keine Drucker.',
+    'step.done_suffix':'fertig',
+    'toast.copied':'Kopiert','toast.deleted':'gelöscht','toast.door_sent':'Tür-Makro gesendet',
+    'toast.drop_file_first':'Bitte zuerst eine .gcode/.3mf Datei ablegen','toast.eject_sent':'Auswurf-Sequenz gesendet',
+    'toast.load_sent':'Lade-Makro gesendet','toast.name_brand_ip_required':'Name, Marke und IP sind erforderlich',
+    'toast.printer_removed':'Drucker entfernt','toast.queue_stopped':'Warteschlange gestoppt — Plätze freigegeben',
+    'toast.queued_slots_locked':'eingereiht — Plätze gesperrt','toast.saved':'gespeichert',
+    'toast.select_park_slot':'Bitte einen Park-Slot auswählen','toast.select_pick_slot':'Bitte einen Entnahme-Slot auswählen',
+    'toast.select_printer':'Bitte einen Drucker auswählen','toast.slot_cleared':'Slot {n} geleert — blockierte Plätze freigegeben',
+    'toast.slot_plate_inserted':'Slot {n}: Platte eingelegt','toast.upload_failed':'Hochladen fehlgeschlagen','toast.uploaded':'hochgeladen',
+    'step.park1_upload':'OttoEject parken + Datei übertragen (parallel)',
+    'step.upload':'Datei an Drucker übertragen',
+    'step.grab_parallel':'Tür öffnen + in Sicherheitsposition fahren + Platte entnehmen','step.load':'Auf Idle warten, dann Platte auf Drucker laden',
+    'step.park':'OttoEject parken','step.print':'Druck starten','step.wait_finish':'Auf Druckende warten',
+    'step.move':'Achse in Sicherheitsposition fahren','step.wait_idle':'Auf Drucker-Idle warten','step.eject':'Druckplatte auswerfen (öffnet Tür)',
+    'step.store':'Platte im Regal verstauen',
+    'jobs.counter_waiting':'wartend','jobs.counter_done':'fertig','jobs.counter_aborted_skipped':'abgebrochen/übersprungen','jobs.counter_total':'gesamt',
+    'settings.per_printer':'pro Drucker',
+    'toast.sync_requested':'Synchronisierung angefordert',
+    'common.loading':'Lädt…','common.select':'— auswählen —',
+    'files.upload':'Hochladen','files.transfer_to_printer':'An Drucker übertragen',
+    'files.drop_hint':'.3mf oder .gcode — wird direkt an den Drucker übertragen','files.click_or_drop':'Datei auswählen oder ablegen',
+    'files.uploading':'Wird hochgeladen…','files.stored_files':'Gespeicherte Dateien',
+    'jobs.start_queue':'Warteschlange starten','jobs.queue_paused_error':'Warteschlange pausiert — Fehler in',
+    'jobs.retry_from_print_start':'Erneut ab Druckstart','jobs.skip_job':'Auftrag überspringen','jobs.abort_free_slots':'Abbrechen & Plätze freigeben',
+    'jobs.active_job':'Aktiver Auftrag','jobs.running':'Läuft','jobs.execution_steps':'Ausführungsschritte',
+    'jobs.new_job':'Neuer Auftrag','jobs.printer':'Drucker','jobs.file_types':'.gcode, .3mf oder .gcode.3mf',
+    'jobs.drop_hint':'Ziehen & ablegen oder klicken — Plätze werden erst beim Einreihen gesperrt',
+    'jobs.bed_type':'Bett-Typ','jobs.bed.textured':'Strukturplatte','jobs.bed.cool':'Cool Plate',
+    'jobs.bed.high_temp':'Hochtemperatur-Platte','jobs.bed.engineering':'Engineering-Platte',
+    'jobs.use_ams':'AMS verwenden','jobs.bed_leveling':'Bett-Nivellierung','jobs.flow_calibration':'Durchfluss-Kalibrierung',
+    'jobs.vibration_calib':'Vibrations-Kalib.','jobs.lidar_inspection':'Lidar-Inspektion','jobs.timelapse':'Zeitraffer',
+    'jobs.plate_before_print':'Platte vor dem Druck','jobs.plate_already_in_printer':'Platte bereits im Drucker',
+    'jobs.pick_plate_from_slot':'Platte aus Slot entnehmen',
+    'jobs.park_after_print':'Parken nach dem Druck','jobs.park_slot_bottom':'Park-Slot (unterster Slot)',
+    'jobs.slots_after_queuing':'Plätze nach dem Einreihen:','jobs.queue_lock_slots':'Einreihen — Plätze sperren',
+    'jobs.slots_locked_hint':'Plätze werden erst beim Einreihen gesperrt.','jobs.queue':'Warteschlange',
+    'legend.plate_ready':'Platte bereit','legend.being_picked':'Wird entnommen','legend.park_target':'Park-Ziel',
+    'legend.print_active':'Druck (aktiv)','legend.print_done_blocked':'Druck (fertig) — blockiert','legend.remove_print':'Druck entfernen',
+    'eject.select_printer':'Drucker auswählen','eject.eject_from_printer':'Vom Drucker auswerfen','eject.load_onto_printer':'Auf Drucker laden',
+    'eject.close_printer_door':'Druckertür schliessen','eject.eject_print_plate':'Druckplatte auswerfen','eject.load_print_plate':'Druckplatte laden',
+    'eject.custom_macro':'Eigenes Makro','eject.run':'Ausführen','eject.klipper_status':'Klipper / Moonraker Status',
+  },
+  fr: {
+    'nav.dashboard':'Tableau de bord','nav.files':'Fichiers','nav.jobs':'Travaux','nav.rack':'Étagère','nav.console':'Console','nav.settings':'Paramètres',
+    'footer.tagline':'OttoBridge · Orchestration de ferme d\'impression',
+    'status.connecting':'Connexion…',
+    'dash.no_printer':'Aucune imprimante','dash.add_printer':'Ajouter une imprimante',
+    'dash.status':'Statut','dash.nozzle':'Buse','dash.bed':'Plateau','dash.progress':'Progression',
+    'dash.print_progress':'Progression de l\'impression','dash.resume':'Reprendre','dash.pause':'Pause','dash.stop':'Arrêter','dash.clear_error':'Effacer l\'erreur',
+    'dash.temperatures':'Températures','dash.cool_down':'Refroidir','dash.sync':'Sync',
+    'dash.print_error':'Erreur d\'impression','dash.acknowledge_error':'Confirmer l\'erreur',
+    'rack.title':'Étagère — emplacement 1 en bas','rack.empty':'Vide','rack.blocked_hint':'Bloqué (occupé par une impression au-dessus)',
+    'rack.slots':'Emplacements','rack.num_slots':'Nombre d\'emplacements','rack.apply':'Appliquer',
+    'console.gcode_console':'Console G-code','console.send':'Envoyer',
+    'console.nozzle_off':'Buse éteinte','console.bed_off':'Plateau éteint','console.home':'Origine','console.motors_off':'Moteurs éteints',
+    'console.fan_max':'Ventilateur max','console.fan_off':'Ventilateur éteint','console.park_ottoeject':'Stationner OttoEject',
+    'settings.connected_printers':'Imprimantes connectées','settings.add_printer':'+ Ajouter une imprimante','settings.new_printer':'Nouvelle imprimante',
+    'settings.name':'Nom','settings.brand':'Marque','settings.model':'Modèle','settings.ip_address':'Adresse IP',
+    'settings.access_code':'Code d\'accès','settings.lan_code':'Code LAN','settings.serial_number':'Numéro de série',
+    'settings.api_key':'Clé API','settings.prusalink_key':'Clé PrusaLink','settings.serial_code':'Code de série',
+    'settings.ff_serial':'Numéro de série FF','settings.check_code':'Code de vérification','settings.ff_check':'Code de vérification FF',
+    'settings.save_connect':'Enregistrer et connecter','settings.cancel':'Annuler','settings.delete':'Supprimer',
+    'settings.ottoeject_calibration':'Calibrage OttoEject',
+    'settings.calibration_hint':'Exécutez ces commandes lors de la première configuration d\'OttoEject ou après une modification de configuration.',
+    'settings.ottoeject_home':'Origine OttoEject','settings.move_to_calib_pos':'Aller à la position de départ pour le calibrage d\'OttoEject',
+    'settings.mainsail_sidebar':'Barre latérale Mainsail',
+    'settings.mainsail_hint_1':'Ajoutez OttoBridge comme lien dans la barre latérale de Mainsail via',
+    'settings.mainsail_hint_2':'Enregistrez ceci sous','settings.mainsail_hint_3':'sur le Pi, puis rechargez Mainsail. Voir INSTALL.md pour les détails.',
+    'settings.copy':'Copier','settings.pi_resources':'Pi Zero 2 W — Ressources','settings.reserve':'Réserve','settings.cpu_load_idle':'Charge CPU (inactif)',
+    'common.error':'Erreur',
+    'confirm.cancel_print':'Annuler l\'impression en cours ?','confirm.remove_printer':'Supprimer cette imprimante ?',
+    'dash.error_code':'Code d\'erreur','dash.layer':'Couche','dash.min':'min','dash.no_active_print':'Aucune impression active',
+    'eject.moonraker_unreachable':'Moonraker injoignable','eject.not_available':'non disponible',
+    'eject.select_printer_hint':'Sélectionnez une imprimante pour voir la séquence d\'éjection.',
+    'files.uploading_named':'Téléversement : {name}…',
+    'jobs.badge_aborted':'Annulé','jobs.badge_done':'Terminé','jobs.badge_error':'Erreur','jobs.badge_running':'En cours',
+    'jobs.badge_skipped':'Ignoré','jobs.badge_waiting':'En attente',
+    'jobs.err_invalid_slot':'Emplacement invalide','jobs.err_slot_blocked':'Emplacement {n} bloqué par une autre impression',
+    'jobs.err_slot_has_plate':'L\'emplacement {n} a déjà un plateau','jobs.err_slot_occupied':'Emplacement {n} occupé',
+    'jobs.err_slot_unavailable':'Emplacement {n} non disponible',
+    'jobs.freed_after_grab':'libéré après prélèvement','jobs.in_printer':'Dans l\'imprimante','jobs.park_label':'stationner',
+    'jobs.pick_arrow':'prélever →','jobs.pick_print_store_back':'prélever → imprimer → ranger',
+    'jobs.queue_empty':'La file est vide.','jobs.retry_from_print_hint':'réessayer depuis le début',
+    'jobs.slot_n':'Emplacement {n}','jobs.slot_unit':'emplacement(s)',
+    'rack.blocked_short':'bloqué','rack.insert_plate':'Insérer le plateau','rack.job_running':'Travail en cours',
+    'rack.locked':'Verrouillé','rack.print_removed':'Impression retirée','rack.remove':'Retirer',
+    'rack.state_empty':'Vide','rack.state_park':'Emplacement de stationnement','rack.state_picked':'En cours de prélèvement',
+    'rack.state_printed':'Impression terminée','rack.state_ready':'Plateau prêt',
+    'settings.no_printers_yet':'Aucune imprimante pour l\'instant.',
+    'step.done_suffix':'terminé',
+    'toast.copied':'Copié','toast.deleted':'supprimé','toast.door_sent':'Macro de porte envoyée',
+    'toast.drop_file_first':'Veuillez d\'abord déposer un fichier .gcode/.3mf','toast.eject_sent':'Séquence d\'éjection envoyée',
+    'toast.load_sent':'Macro de chargement envoyée','toast.name_brand_ip_required':'Nom, marque et IP requis',
+    'toast.printer_removed':'Imprimante supprimée','toast.queue_stopped':'File arrêtée — emplacements libérés',
+    'toast.queued_slots_locked':'mis en file — emplacements verrouillés','toast.saved':'enregistré',
+    'toast.select_park_slot':'Veuillez sélectionner un emplacement de stationnement','toast.select_pick_slot':'Veuillez sélectionner un emplacement de prélèvement',
+    'toast.select_printer':'Veuillez sélectionner une imprimante','toast.slot_cleared':'Emplacement {n} vidé — emplacements bloqués libérés',
+    'toast.slot_plate_inserted':'Emplacement {n} : plateau inséré','toast.upload_failed':'Échec du téléversement','toast.uploaded':'téléversé',
+    'step.park1_upload':'Stationner OttoEject + transférer fichier (parallèle)',
+    'step.upload':'Transférer le fichier vers l\'imprimante',
+    'step.grab_parallel':'Ouvrir la porte + position de sécurité + prélever le plateau','step.load':'Attendre l\'inactivité, puis charger le plateau',
+    'step.park':'Stationner OttoEject','step.print':'Démarrer l\'impression','step.wait_finish':'Attendre la fin de l\'impression',
+    'step.move':'Déplacer l\'axe en position de sécurité','step.wait_idle':'Attendre l\'inactivité de l\'imprimante','step.eject':'Éjecter le plateau (ouvre la porte)',
+    'step.store':'Ranger le plateau dans l\'étagère',
+    'jobs.counter_waiting':'en attente','jobs.counter_done':'terminé','jobs.counter_aborted_skipped':'annulé/ignoré','jobs.counter_total':'total',
+    'settings.per_printer':'par imprimante',
+    'toast.sync_requested':'Synchronisation demandée',
+    'common.loading':'Chargement…','common.select':'— sélectionner —',
+    'files.upload':'Téléverser','files.transfer_to_printer':'Transférer vers l\'imprimante',
+    'files.drop_hint':'.3mf ou .gcode — transféré directement vers l\'imprimante','files.click_or_drop':'Cliquer ou déposer un fichier',
+    'files.uploading':'Téléversement…','files.stored_files':'Fichiers enregistrés',
+    'jobs.start_queue':'Démarrer la file','jobs.queue_paused_error':'File en pause — erreur dans',
+    'jobs.retry_from_print_start':'Réessayer depuis le début','jobs.skip_job':'Ignorer le travail','jobs.abort_free_slots':'Annuler et libérer les emplacements',
+    'jobs.active_job':'Travail actif','jobs.running':'En cours','jobs.execution_steps':'Étapes d\'exécution',
+    'jobs.new_job':'Nouveau travail','jobs.printer':'Imprimante','jobs.file_types':'.gcode, .3mf ou .gcode.3mf',
+    'jobs.drop_hint':'Glisser-déposer ou cliquer — emplacements verrouillés seulement une fois mis en file',
+    'jobs.bed_type':'Type de plateau','jobs.bed.textured':'Plateau texturé','jobs.bed.cool':'Plateau froid',
+    'jobs.bed.high_temp':'Plateau haute température','jobs.bed.engineering':'Plateau technique',
+    'jobs.use_ams':'Utiliser l\'AMS','jobs.bed_leveling':'Mise à niveau du plateau','jobs.flow_calibration':'Calibration du débit',
+    'jobs.vibration_calib':'Calib. vibrations','jobs.lidar_inspection':'Inspection Lidar','jobs.timelapse':'Timelapse',
+    'jobs.plate_before_print':'Plateau avant impression','jobs.plate_already_in_printer':'Plateau déjà dans l\'imprimante',
+    'jobs.pick_plate_from_slot':'Prendre le plateau dans l\'emplacement',
+    'jobs.park_after_print':'Stationner après impression','jobs.park_slot_bottom':'Emplacement de stationnement (bas)',
+    'jobs.slots_after_queuing':'Emplacements après mise en file :','jobs.queue_lock_slots':'Mettre en file — verrouiller les emplacements',
+    'jobs.slots_locked_hint':'Les emplacements ne sont verrouillés qu\'une fois mis en file.','jobs.queue':'File d\'attente',
+    'legend.plate_ready':'Plateau prêt','legend.being_picked':'En cours de prélèvement','legend.park_target':'Cible de stationnement',
+    'legend.print_active':'Impression (active)','legend.print_done_blocked':'Impression (terminée) — bloqué','legend.remove_print':'Retirer l\'impression',
+    'eject.select_printer':'Sélectionner l\'imprimante','eject.eject_from_printer':'Éjecter de l\'imprimante','eject.load_onto_printer':'Charger sur l\'imprimante',
+    'eject.close_printer_door':'Fermer la porte de l\'imprimante','eject.eject_print_plate':'Éjecter le plateau','eject.load_print_plate':'Charger le plateau',
+    'eject.custom_macro':'Macro personnalisée','eject.run':'Exécuter','eject.klipper_status':'Statut Klipper / Moonraker',
+  },
+  it: {
+    'nav.dashboard':'Dashboard','nav.files':'File','nav.jobs':'Lavori','nav.rack':'Rastrelliera','nav.console':'Console','nav.settings':'Impostazioni',
+    'footer.tagline':'OttoBridge · Orchestrazione farm di stampa',
+    'status.connecting':'Connessione…',
+    'dash.no_printer':'Nessuna stampante','dash.add_printer':'Aggiungi stampante',
+    'dash.status':'Stato','dash.nozzle':'Ugello','dash.bed':'Piano','dash.progress':'Avanzamento',
+    'dash.print_progress':'Avanzamento stampa','dash.resume':'Riprendi','dash.pause':'Pausa','dash.stop':'Stop','dash.clear_error':'Cancella errore',
+    'dash.temperatures':'Temperature','dash.cool_down':'Raffredda','dash.sync':'Sync',
+    'dash.print_error':'Errore di stampa','dash.acknowledge_error':'Conferma errore',
+    'rack.title':'Rastrelliera — Slot 1 in basso','rack.empty':'Vuoto','rack.blocked_hint':'Bloccato (occupato da una stampa sopra)',
+    'rack.slots':'Slot','rack.num_slots':'Numero di slot','rack.apply':'Applica',
+    'console.gcode_console':'Console G-code','console.send':'Invia',
+    'console.nozzle_off':'Ugello spento','console.bed_off':'Piano spento','console.home':'Home','console.motors_off':'Motori spenti',
+    'console.fan_max':'Ventola max','console.fan_off':'Ventola spenta','console.park_ottoeject':'Parcheggia OttoEject',
+    'settings.connected_printers':'Stampanti connesse','settings.add_printer':'+ Aggiungi stampante','settings.new_printer':'Nuova stampante',
+    'settings.name':'Nome','settings.brand':'Marca','settings.model':'Modello','settings.ip_address':'Indirizzo IP',
+    'settings.access_code':'Codice di accesso','settings.lan_code':'Codice LAN','settings.serial_number':'Numero di serie',
+    'settings.api_key':'Chiave API','settings.prusalink_key':'Chiave PrusaLink','settings.serial_code':'Codice seriale',
+    'settings.ff_serial':'Numero di serie FF','settings.check_code':'Codice di verifica','settings.ff_check':'Codice di verifica FF',
+    'settings.save_connect':'Salva e connetti','settings.cancel':'Annulla','settings.delete':'Elimina',
+    'settings.ottoeject_calibration':'Calibrazione OttoEject',
+    'settings.calibration_hint':'Esegui questi comandi durante la configurazione iniziale di OttoEject o dopo una modifica della configurazione.',
+    'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Vai alla posizione iniziale per la calibrazione di OttoEject',
+    'settings.mainsail_sidebar':'Barra laterale Mainsail',
+    'settings.mainsail_hint_1':'Aggiungi OttoBridge come link nella barra laterale di Mainsail tramite',
+    'settings.mainsail_hint_2':'Salva questo come','settings.mainsail_hint_3':'sul Pi, poi ricarica Mainsail. Vedi INSTALL.md per i dettagli.',
+    'settings.copy':'Copia','settings.pi_resources':'Pi Zero 2 W — Risorse','settings.reserve':'Riserva','settings.cpu_load_idle':'Carico CPU (inattivo)',
+    'common.error':'Errore',
+    'confirm.cancel_print':'Annullare la stampa in corso?','confirm.remove_printer':'Rimuovere questa stampante?',
+    'dash.error_code':'Codice errore','dash.layer':'Strato','dash.min':'min','dash.no_active_print':'Nessuna stampa attiva',
+    'eject.moonraker_unreachable':'Moonraker non raggiungibile','eject.not_available':'non disponibile',
+    'eject.select_printer_hint':'Seleziona una stampante per vedere la sequenza di espulsione.',
+    'files.uploading_named':'Caricamento: {name}…',
+    'jobs.badge_aborted':'Annullato','jobs.badge_done':'Completato','jobs.badge_error':'Errore','jobs.badge_running':'In esecuzione',
+    'jobs.badge_skipped':'Saltato','jobs.badge_waiting':'In attesa',
+    'jobs.err_invalid_slot':'Slot non valido','jobs.err_slot_blocked':'Slot {n} bloccato da un\'altra stampa',
+    'jobs.err_slot_has_plate':'Lo slot {n} ha già un piano','jobs.err_slot_occupied':'Slot {n} occupato',
+    'jobs.err_slot_unavailable':'Slot {n} non disponibile',
+    'jobs.freed_after_grab':'liberato dopo il prelievo','jobs.in_printer':'Nella stampante','jobs.park_label':'parcheggia',
+    'jobs.pick_arrow':'preleva →','jobs.pick_print_store_back':'preleva → stampa → rimetti a posto',
+    'jobs.queue_empty':'La coda è vuota.','jobs.retry_from_print_hint':'riprova dall\'inizio',
+    'jobs.slot_n':'Slot {n}','jobs.slot_unit':'slot',
+    'rack.blocked_short':'bloccato','rack.insert_plate':'Inserisci piano','rack.job_running':'Lavoro in corso',
+    'rack.locked':'Bloccato','rack.print_removed':'Stampa rimossa','rack.remove':'Rimuovi',
+    'rack.state_empty':'Vuoto','rack.state_park':'Slot di parcheggio','rack.state_picked':'In prelievo',
+    'rack.state_printed':'Stampa finita','rack.state_ready':'Piano pronto',
+    'settings.no_printers_yet':'Nessuna stampante ancora.',
+    'step.done_suffix':'completato',
+    'toast.copied':'Copiato','toast.deleted':'eliminato','toast.door_sent':'Macro sportello inviata',
+    'toast.drop_file_first':'Trascina prima un file .gcode/.3mf','toast.eject_sent':'Sequenza di espulsione inviata',
+    'toast.load_sent':'Macro di caricamento inviata','toast.name_brand_ip_required':'Nome, marca e IP sono obbligatori',
+    'toast.printer_removed':'Stampante rimossa','toast.queue_stopped':'Coda fermata — slot liberati',
+    'toast.queued_slots_locked':'in coda — slot bloccati','toast.saved':'salvato',
+    'toast.select_park_slot':'Seleziona uno slot di parcheggio','toast.select_pick_slot':'Seleziona uno slot di prelievo',
+    'toast.select_printer':'Seleziona una stampante','toast.slot_cleared':'Slot {n} svuotato — slot bloccati liberati',
+    'toast.slot_plate_inserted':'Slot {n}: piano inserito','toast.upload_failed':'Caricamento fallito','toast.uploaded':'caricato',
+    'step.park1_upload':'Parcheggia OttoEject + carica file (parallelo)',
+    'step.upload':'Carica file sulla stampante',
+    'step.grab_parallel':'Apri sportello + posizione sicura + preleva piano','step.load':'Attendi inattività, poi carica il piano',
+    'step.park':'Parcheggia OttoEject','step.print':'Avvia stampa','step.wait_finish':'Attendi fine stampa',
+    'step.move':'Sposta asse in posizione sicura','step.wait_idle':'Attendi stampante inattiva','step.eject':'Espelli piano di stampa (apre sportello)',
+    'step.store':'Riponi il piano nella rastrelliera',
+    'jobs.counter_waiting':'in attesa','jobs.counter_done':'completati','jobs.counter_aborted_skipped':'annullati/saltati','jobs.counter_total':'totale',
+    'settings.per_printer':'per stampante',
+    'toast.sync_requested':'Sincronizzazione richiesta',
+    'common.loading':'Caricamento…','common.select':'— seleziona —',
+    'files.upload':'Carica','files.transfer_to_printer':'Trasferisci alla stampante',
+    'files.drop_hint':'.3mf o .gcode — trasferito direttamente alla stampante','files.click_or_drop':'Clicca o trascina un file',
+    'files.uploading':'Caricamento in corso…','files.stored_files':'File salvati',
+    'jobs.start_queue':'Avvia coda','jobs.queue_paused_error':'Coda in pausa — errore in',
+    'jobs.retry_from_print_start':'Riprova dall\'inizio stampa','jobs.skip_job':'Salta lavoro','jobs.abort_free_slots':'Annulla e libera gli slot',
+    'jobs.active_job':'Lavoro attivo','jobs.running':'In esecuzione','jobs.execution_steps':'Passaggi di esecuzione',
+    'jobs.new_job':'Nuovo lavoro','jobs.printer':'Stampante','jobs.file_types':'.gcode, .3mf o .gcode.3mf',
+    'jobs.drop_hint':'Trascina o clicca — gli slot si bloccano solo quando in coda',
+    'jobs.bed_type':'Tipo di piano','jobs.bed.textured':'Piano testurizzato','jobs.bed.cool':'Piano freddo',
+    'jobs.bed.high_temp':'Piano alta temperatura','jobs.bed.engineering':'Piano ingegneristico',
+    'jobs.use_ams':'Usa AMS','jobs.bed_leveling':'Livellamento piano','jobs.flow_calibration':'Calibrazione flusso',
+    'jobs.vibration_calib':'Calib. vibrazioni','jobs.lidar_inspection':'Ispezione Lidar','jobs.timelapse':'Timelapse',
+    'jobs.plate_before_print':'Piano prima della stampa','jobs.plate_already_in_printer':'Piano già nella stampante',
+    'jobs.pick_plate_from_slot':'Preleva piano dallo slot',
+    'jobs.park_after_print':'Parcheggia dopo la stampa','jobs.park_slot_bottom':'Slot di parcheggio (in basso)',
+    'jobs.slots_after_queuing':'Slot dopo la messa in coda:','jobs.queue_lock_slots':'Metti in coda — blocca slot',
+    'jobs.slots_locked_hint':'Gli slot si bloccano solo quando in coda.','jobs.queue':'Coda',
+    'legend.plate_ready':'Piano pronto','legend.being_picked':'In prelievo','legend.park_target':'Destinazione parcheggio',
+    'legend.print_active':'Stampa (attiva)','legend.print_done_blocked':'Stampa (finita) — bloccato','legend.remove_print':'Rimuovi stampa',
+    'eject.select_printer':'Seleziona stampante','eject.eject_from_printer':'Espelli dalla stampante','eject.load_onto_printer':'Carica sulla stampante',
+    'eject.close_printer_door':'Chiudi sportello stampante','eject.eject_print_plate':'Espelli piano di stampa','eject.load_print_plate':'Carica piano di stampa',
+    'eject.custom_macro':'Macro personalizzata','eject.run':'Esegui','eject.klipper_status':'Stato Klipper / Moonraker',
+  },
+  es: {
+    'nav.dashboard':'Panel','nav.files':'Archivos','nav.jobs':'Trabajos','nav.rack':'Estante','nav.console':'Consola','nav.settings':'Ajustes',
+    'footer.tagline':'OttoBridge · Orquestación de granja de impresión',
+    'status.connecting':'Conectando…',
+    'dash.no_printer':'Aún no hay impresora','dash.add_printer':'Añadir impresora',
+    'dash.status':'Estado','dash.nozzle':'Boquilla','dash.bed':'Cama','dash.progress':'Progreso',
+    'dash.print_progress':'Progreso de impresión','dash.resume':'Reanudar','dash.pause':'Pausar','dash.stop':'Detener','dash.clear_error':'Borrar error',
+    'dash.temperatures':'Temperaturas','dash.cool_down':'Enfriar','dash.sync':'Sync',
+    'dash.print_error':'Error de impresión','dash.acknowledge_error':'Confirmar error',
+    'rack.title':'Estante — ranura 1 abajo','rack.empty':'Vacío','rack.blocked_hint':'Bloqueado (ocupado por una impresión arriba)',
+    'rack.slots':'Ranuras','rack.num_slots':'Número de ranuras','rack.apply':'Aplicar',
+    'console.gcode_console':'Consola G-code','console.send':'Enviar',
+    'console.nozzle_off':'Boquilla apagada','console.bed_off':'Cama apagada','console.home':'Origen','console.motors_off':'Motores apagados',
+    'console.fan_max':'Ventilador máx','console.fan_off':'Ventilador apagado','console.park_ottoeject':'Estacionar OttoEject',
+    'settings.connected_printers':'Impresoras conectadas','settings.add_printer':'+ Añadir impresora','settings.new_printer':'Nueva impresora',
+    'settings.name':'Nombre','settings.brand':'Marca','settings.model':'Modelo','settings.ip_address':'Dirección IP',
+    'settings.access_code':'Código de acceso','settings.lan_code':'Código LAN','settings.serial_number':'Número de serie',
+    'settings.api_key':'Clave API','settings.prusalink_key':'Clave PrusaLink','settings.serial_code':'Código de serie',
+    'settings.ff_serial':'Número de serie FF','settings.check_code':'Código de verificación','settings.ff_check':'Código de verificación FF',
+    'settings.save_connect':'Guardar y conectar','settings.cancel':'Cancelar','settings.delete':'Eliminar',
+    'settings.ottoeject_calibration':'Calibración de OttoEject',
+    'settings.calibration_hint':'Ejecuta estos comandos al configurar OttoEject por primera vez o tras un cambio de configuración.',
+    'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Ir a la posición inicial para la calibración de OttoEject',
+    'settings.mainsail_sidebar':'Barra lateral de Mainsail',
+    'settings.mainsail_hint_1':'Añade OttoBridge como enlace en la barra lateral de Mainsail mediante',
+    'settings.mainsail_hint_2':'Guarda esto como','settings.mainsail_hint_3':'en el Pi, luego recarga Mainsail. Consulta INSTALL.md para más detalles.',
+    'settings.copy':'Copiar','settings.pi_resources':'Pi Zero 2 W — Recursos','settings.reserve':'Reserva','settings.cpu_load_idle':'Carga de CPU (inactivo)',
+    'common.error':'Error',
+    'confirm.cancel_print':'¿Cancelar la impresión actual?','confirm.remove_printer':'¿Eliminar esta impresora?',
+    'dash.error_code':'Código de error','dash.layer':'Capa','dash.min':'min','dash.no_active_print':'Sin impresión activa',
+    'eject.moonraker_unreachable':'Moonraker no accesible','eject.not_available':'no disponible',
+    'eject.select_printer_hint':'Selecciona una impresora para ver la secuencia de expulsión.',
+    'files.uploading_named':'Subiendo: {name}…',
+    'jobs.badge_aborted':'Cancelado','jobs.badge_done':'Listo','jobs.badge_error':'Error','jobs.badge_running':'En curso',
+    'jobs.badge_skipped':'Omitido','jobs.badge_waiting':'Esperando',
+    'jobs.err_invalid_slot':'Ranura no válida','jobs.err_slot_blocked':'Ranura {n} bloqueada por otra impresión',
+    'jobs.err_slot_has_plate':'La ranura {n} ya tiene una placa','jobs.err_slot_occupied':'Ranura {n} ocupada',
+    'jobs.err_slot_unavailable':'Ranura {n} no disponible',
+    'jobs.freed_after_grab':'se libera tras recoger','jobs.in_printer':'En la impresora','jobs.park_label':'estacionar',
+    'jobs.pick_arrow':'recoger →','jobs.pick_print_store_back':'recoger → imprimir → guardar de nuevo',
+    'jobs.queue_empty':'La cola está vacía.','jobs.retry_from_print_hint':'reintentar desde el inicio',
+    'jobs.slot_n':'Ranura {n}','jobs.slot_unit':'ranura(s)',
+    'rack.blocked_short':'bloqueado','rack.insert_plate':'Insertar placa','rack.job_running':'Trabajo en curso',
+    'rack.locked':'Bloqueado','rack.print_removed':'Impresión retirada','rack.remove':'Quitar',
+    'rack.state_empty':'Vacío','rack.state_park':'Ranura de estacionamiento','rack.state_picked':'Siendo recogida',
+    'rack.state_printed':'Impresión terminada','rack.state_ready':'Placa lista',
+    'settings.no_printers_yet':'Aún no hay impresoras.',
+    'step.done_suffix':'completado',
+    'toast.copied':'Copiado','toast.deleted':'eliminado','toast.door_sent':'Macro de puerta enviada',
+    'toast.drop_file_first':'Por favor, suelta primero un archivo .gcode/.3mf','toast.eject_sent':'Secuencia de expulsión enviada',
+    'toast.load_sent':'Macro de carga enviada','toast.name_brand_ip_required':'Nombre, marca e IP son obligatorios',
+    'toast.printer_removed':'Impresora eliminada','toast.queue_stopped':'Cola detenida — ranuras liberadas',
+    'toast.queued_slots_locked':'en cola — ranuras bloqueadas','toast.saved':'guardado',
+    'toast.select_park_slot':'Selecciona una ranura de estacionamiento','toast.select_pick_slot':'Selecciona una ranura de recogida',
+    'toast.select_printer':'Selecciona una impresora','toast.slot_cleared':'Ranura {n} vaciada — ranuras bloqueadas liberadas',
+    'toast.slot_plate_inserted':'Ranura {n}: placa insertada','toast.upload_failed':'Error al subir','toast.uploaded':'subido',
+    'step.park1_upload':'Estacionar OttoEject + subir archivo (paralelo)',
+    'step.upload':'Subir archivo a la impresora',
+    'step.grab_parallel':'Abrir puerta + posición segura + recoger placa','step.load':'Esperar inactividad y luego cargar la placa',
+    'step.park':'Estacionar OttoEject','step.print':'Iniciar impresión','step.wait_finish':'Esperar fin de impresión',
+    'step.move':'Mover eje a posición segura','step.wait_idle':'Esperar impresora inactiva','step.eject':'Expulsar placa (abre la puerta)',
+    'step.store':'Guardar placa en el estante',
+    'jobs.counter_waiting':'esperando','jobs.counter_done':'listos','jobs.counter_aborted_skipped':'cancelados/omitidos','jobs.counter_total':'total',
+    'settings.per_printer':'por impresora',
+    'toast.sync_requested':'Sincronización solicitada',
+    'common.loading':'Cargando…','common.select':'— seleccionar —',
+    'files.upload':'Subir','files.transfer_to_printer':'Transferir a la impresora',
+    'files.drop_hint':'.3mf o .gcode — transferido directamente a la impresora','files.click_or_drop':'Haz clic o arrastra un archivo',
+    'files.uploading':'Subiendo…','files.stored_files':'Archivos guardados',
+    'jobs.start_queue':'Iniciar cola','jobs.queue_paused_error':'Cola pausada — error en',
+    'jobs.retry_from_print_start':'Reintentar desde el inicio','jobs.skip_job':'Omitir trabajo','jobs.abort_free_slots':'Cancelar y liberar ranuras',
+    'jobs.active_job':'Trabajo activo','jobs.running':'En curso','jobs.execution_steps':'Pasos de ejecución',
+    'jobs.new_job':'Nuevo trabajo','jobs.printer':'Impresora','jobs.file_types':'.gcode, .3mf o .gcode.3mf',
+    'jobs.drop_hint':'Arrastra y suelta o haz clic — las ranuras se bloquean solo al poner en cola',
+    'jobs.bed_type':'Tipo de cama','jobs.bed.textured':'Placa texturizada','jobs.bed.cool':'Placa fría',
+    'jobs.bed.high_temp':'Placa alta temperatura','jobs.bed.engineering':'Placa de ingeniería',
+    'jobs.use_ams':'Usar AMS','jobs.bed_leveling':'Nivelación de cama','jobs.flow_calibration':'Calibración de flujo',
+    'jobs.vibration_calib':'Calib. de vibración','jobs.lidar_inspection':'Inspección Lidar','jobs.timelapse':'Timelapse',
+    'jobs.plate_before_print':'Placa antes de imprimir','jobs.plate_already_in_printer':'Placa ya en la impresora',
+    'jobs.pick_plate_from_slot':'Tomar placa de la ranura','jobs.park_after_print':'Estacionar tras imprimir',
+    'jobs.park_slot_bottom':'Ranura de estacionamiento (inferior)','jobs.slots_after_queuing':'Ranuras tras poner en cola:',
+    'jobs.queue_lock_slots':'Poner en cola — bloquear ranuras','jobs.slots_locked_hint':'Las ranuras se bloquean solo al poner en cola.',
+    'jobs.queue':'Cola',
+    'eject.select_printer':'Seleccionar impresora','eject.eject_from_printer':'Expulsar de la impresora',
+    'eject.load_onto_printer':'Cargar en la impresora','eject.close_printer_door':'Cerrar puerta de la impresora',
+    'eject.eject_print_plate':'Expulsar placa de impresión','eject.load_print_plate':'Cargar placa de impresión',
+    'eject.custom_macro':'Macro personalizada','eject.run':'Ejecutar','eject.klipper_status':'Estado de Klipper / Moonraker',
+    'legend.plate_ready':'Placa lista','legend.being_picked':'Siendo recogida','legend.park_target':'Destino de estacionamiento',
+    'legend.print_active':'Impresión (activa)','legend.print_done_blocked':'Impresión (lista) — bloqueada','legend.remove_print':'Retirar impresión',
+  },
+};
+let currentLang = localStorage.getItem('ottobridge_lang') || 'en';
+
+function t(key){
+  return (I18N[currentLang] && I18N[currentLang][key]) || (I18N.en && I18N.en[key]) || key;
+}
+
+function applyI18n(){
+  document.documentElement.lang = currentLang;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key = el.getAttribute('data-i18n');
+    el.textContent = t(key);
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{
+    const key = el.getAttribute('data-i18n-ph');
+    el.placeholder = t(key);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>{
+    const key = el.getAttribute('data-i18n-title');
+    el.title = t(key);
+  });
+  const sel = document.getElementById('lang-select');
+  if(sel) sel.value = currentLang;
+  const idx = TAB_NAMES.indexOf(currentActiveTab());
+  if(idx>=0) document.getElementById('topbar-title').textContent = t(TAB_TITLE_KEYS[TAB_NAMES[idx]]) || TAB_TITLES[TAB_NAMES[idx]];
+}
+
+function currentActiveTab(){
+  const active = document.querySelector('.tab-pane.active');
+  return active ? active.id.replace('tab-','') : 'dashboard';
+}
+
+function setLang(lang){
+  currentLang = lang;
+  localStorage.setItem('ottobridge_lang', lang);
+  applyI18n();
+  renderAll();renderRack();renderJobs();renderQueueUI();updateJobSlotSelects();
+  onEjectPrinter();updateCalibHint();
+}
+
 const S={};let dashPid=null,brands={},ws,wsT;
 const TAB_NAMES=['dashboard','files','jobs','eject','rack','console','settings'];
 const MAX_SLOTS_SOFT=30, SLOT_GAP=55;
@@ -558,6 +1057,7 @@ let jobsState=[];
   const qd=await api('GET','/api/queue');
   if(qd)queueState=qd;
   jobsState=await api('GET','/api/jobs')||[];
+  applyI18n();
   renderAll();renderRack();renderJobs();renderQueueUI();
   if(!dashPid&&init.length)selectDash(init[0].id);
   connectWS();
@@ -638,7 +1138,7 @@ function renderAll(){
           ${p.progress!=null?`<span style="font-size:9px;color:var(--muted)">${Math.round(p.progress)}%</span>`:''}
         </div>
       </div>`).join('')
-    :'<div style="color:var(--muted);font-size:11px;padding:12px">No printers yet.</div>';
+    :`<div style="color:var(--muted);font-size:11px;padding:12px">${t('settings.no_printers_yet')}</div>`;
 
   updateSelects(plist);
 }
@@ -673,11 +1173,11 @@ function renderDash(){
   setText('t-bed-tgt',p.bed_target!=null?`→ ${fmt1(p.bed_target)}°`:'');
   const pct=p.progress!=null?Math.min(100,Math.max(0,p.progress)):0;
   document.getElementById('s-bar').style.width=pct+'%';
-  setText('s-filename',p.filename||'No active print');
-  setText('s-layers',(p.layer_num!=null&&p.total_layer_num!=null)?`Layer ${p.layer_num} / ${p.total_layer_num}`:'—');
-  setText('s-remaining',p.remaining_min!=null?`${p.remaining_min} min`:'—');
+  setText('s-filename',p.filename||t('dash.no_active_print'));
+  setText('s-layers',(p.layer_num!=null&&p.total_layer_num!=null)?`${t('dash.layer')} ${p.layer_num} / ${p.total_layer_num}`:'—');
+  setText('s-remaining',p.remaining_min!=null?`${p.remaining_min} ${t('dash.min')}`:'—');
   const ec=document.getElementById('error-card');
-  if(p.print_error&&p.print_error!=='0'){ec.style.display='block';setText('error-code',`Error code: ${p.print_error}`);}
+  if(p.print_error&&p.print_error!=='0'){ec.style.display='block';setText('error-code',`${t('dash.error_code')}: ${p.print_error}`);}
   else ec.style.display='none';
   const ams=p.ams;
   const ac=document.getElementById('ams-card');
@@ -705,7 +1205,7 @@ async function ctrl(action){
   await api('POST',`/api/print/${ep}`,{printer_id:dashPid});
 }
 async function quickGcodeD(cmd){if(!dashPid)return;await api('POST','/api/gcode',{printer_id:dashPid,command:cmd});}
-function confirmStop(){if(confirm('Cancel the current print?'))ctrl('stop');}
+function confirmStop(){if(confirm(t('confirm.cancel_print')))ctrl('stop');}
 
 // PRINTER CRUD
 function openAddForm(){
@@ -742,17 +1242,17 @@ async function savePrinter(){
   const body={id:pid||undefined,name:v('pf-name'),brand:v('pf-brand'),model:v('pf-model'),
     ip:v('pf-ip'),access_code:v('pf-code'),serial:v('pf-serial'),
     api_key:v('pf-apikey'),serial_code:v('pf-sc'),check_code:v('pf-cc')};
-  if(!body.name||!body.brand||!body.ip){toast('err','Name, brand and IP are required');return;}
+  if(!body.name||!body.brand||!body.ip){toast('err',t('toast.name_brand_ip_required'));return;}
   const r=await api(pid?'PUT':'POST',pid?`/api/printers/${pid}`:'/api/printers',body);
-  if(r){S[r.id]=r;renderAll();closeForm();toast('ok',`${r.name} saved ✓`);if(!dashPid)selectDash(r.id);}
+  if(r){S[r.id]=r;renderAll();closeForm();toast('ok',`${r.name} ${t('toast.saved')} ✓`);if(!dashPid)selectDash(r.id);}
 }
 
 async function delPrinter(){
   const pid=document.getElementById('pf-id').value;
-  if(!pid||!confirm('Remove this printer?'))return;
+  if(!pid||!confirm(t('confirm.remove_printer')))return;
   await api('DELETE',`/api/printers/${pid}`);
   delete S[pid];if(dashPid===pid)dashPid=null;
-  renderAll();closeForm();toast('ok','Printer removed');
+  renderAll();closeForm();toast('ok',t('toast.printer_removed'));
 }
 
 function closeForm(){document.getElementById('pform').style.display='none';}
@@ -761,15 +1261,15 @@ function closeForm(){document.getElementById('pform').style.display='none';}
 async function uploadFile(file){
   if(!file)return;
   const pid=document.getElementById('upload-target').value;
-  if(!pid){toast('err','Please select a printer');return;}
+  if(!pid){toast('err',t('toast.select_printer'));return;}
   document.getElementById('upload-prog').style.display='block';
-  document.getElementById('upload-lbl').textContent=`Uploading: ${file.name}…`;
+  document.getElementById('upload-lbl').textContent=`${t('files.uploading_named').replace('{name}', file.name)}`;
   const fd=new FormData();fd.append('file',file);
   try{
     const r=await fetch(`/api/upload/${pid}`,{method:'POST',body:fd});
     const d=await r.json();
-    if(d.ok){toast('ok',`${file.name} uploaded ✓`);loadFiles();}
-    else toast('err',d.detail||'Upload failed');
+    if(d.ok){toast('ok',`${file.name} ${t('toast.uploaded')} ✓`);loadFiles();}
+    else toast('err',d.detail||t('toast.upload_failed'));
   }catch(e){toast('err',e.message);}
   finally{document.getElementById('upload-prog').style.display='none';document.getElementById('file-input').value='';}
 }
@@ -788,7 +1288,7 @@ async function loadFiles(){
   }
 }
 
-async function delFile(name){await api('DELETE',`/api/files/${encodeURIComponent(name)}`);toast('ok',`${name} deleted`);loadFiles();}
+async function delFile(name){await api('DELETE',`/api/files/${encodeURIComponent(name)}`);toast('ok',`${name} ${t('toast.deleted')}`);loadFiles();}
 
 // ── RACK SVG RENDERER ────────────────────────────────────────────────────────
 // Slot states: empty | ready | grab_reserved | park | printed
@@ -931,7 +1431,9 @@ function drawRack(svgId, highlight){
   tl.textContent=`${numSlots}↑`; svg.appendChild(tl);
 }
 
-const RACK_STATE_LABEL={empty:'Empty',ready:'Plate ready',grab_reserved:'Being picked',park:'Park slot',printed:'Print finished'};
+function RACK_STATE_LABEL(state){
+  return {empty:t('rack.state_empty'),ready:t('rack.state_ready'),grab_reserved:t('rack.state_picked'),park:t('rack.state_park'),printed:t('rack.state_printed')}[state]||state;
+}
 
 function renderRack(){
   drawRack('rack-svg');
@@ -950,19 +1452,19 @@ function renderRack(){
     let action='';
     if(s.state==='empty'){
       action=isBlk
-        ?`<span style="font-size:9px;color:var(--yel)">⊘ blocked</span>`
-        :`<button class="btn btn-green btn-sm" onclick="rackInsertPlate(${i})">+ Insert plate</button>`;
+        ?`<span style="font-size:9px;color:var(--yel)">⊘ ${t('rack.blocked_short')}</span>`
+        :`<button class="btn btn-green btn-sm" onclick="rackInsertPlate(${i})">+ ${t('rack.insert_plate')}</button>`;
     }else if(s.state==='ready'){
-      action=`<button class="btn btn-yel btn-sm" onclick="rackRemovePlate(${i})">Remove</button>`;
+      action=`<button class="btn btn-yel btn-sm" onclick="rackRemovePlate(${i})">${t('rack.remove')}</button>`;
     }else if(s.state==='grab_reserved'){
-      action=`<span style="font-size:9px;color:var(--blu)">Job running</span>`;
+      action=`<span style="font-size:9px;color:var(--blu)">${t('rack.job_running')}</span>`;
     }else if(s.state==='park'){
-      action=`<span style="font-size:9px;color:var(--muted)">Locked</span>`;
+      action=`<span style="font-size:9px;color:var(--muted)">${t('rack.locked')}</span>`;
     }else if(s.state==='printed'){
-      action=`<button class="btn btn-danger btn-sm" onclick="rackClearPrint(${i})">Print removed ✓</button>`;
+      action=`<button class="btn btn-danger btn-sm" onclick="rackClearPrint(${i})">${t('rack.print_removed')} ✓</button>`;
     }
 
-    let labelText=RACK_STATE_LABEL[s.state]||s.state;
+    let labelText=RACK_STATE_LABEL(s.state);
     let labelColor={empty:'var(--muted)',ready:'#22c55e',grab_reserved:'#3b82f6',park:'#eab308',printed:'#f472b6'}[s.state]||'var(--muted)';
     let borderColor=isBlk?'#eab308':({empty:'var(--brd2)',ready:'#22c55e',grab_reserved:'#3b82f6',park:'#eab308',printed:'#f472b6'}[s.state]||'var(--brd2)');
     let bg=isBlk?'rgba(234,179,8,.05)':'var(--bg)';
@@ -980,7 +1482,7 @@ function renderRack(){
     }
 
     html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-      <span style="font-size:9px;color:var(--muted);width:48px;text-align:right;flex-shrink:0">Slot ${i+1}${i===0?' ↓':i===n-1?' ↑':''}</span>
+      <span style="font-size:9px;color:var(--muted);width:48px;text-align:right;flex-shrink:0">${t('jobs.slot_n').replace('{n}', i+1)}${i===0?' ↓':i===n-1?' ↑':''}</span>
       <div style="flex:1;height:26px;border-radius:2px;display:flex;align-items:center;padding:0 9px;font-size:10px;border:1px ${isBlk?'dashed':'solid'} ${borderColor};background:${bg}">
         <span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${labelColor}">${esc(labelText)}</span>
       </div>
@@ -998,7 +1500,7 @@ async function setSlotCount(){
 
 async function rackInsertPlate(idx){
   const r=await api('PUT','/api/rack/slot',{slot_index:idx,state:'ready',label:'Plate loaded',note:''});
-  if(r){rackState=r;renderRack();updateJobSlotSelects();toast('ok',`Slot ${idx+1}: plate inserted ✓`);}
+  if(r){rackState=r;renderRack();updateJobSlotSelects();toast('ok',`${t('toast.slot_plate_inserted').replace('{n}', idx+1)} ✓`);}
 }
 async function rackRemovePlate(idx){
   const r=await api('PUT','/api/rack/slot',{slot_index:idx,state:'empty',label:'',note:''});
@@ -1006,7 +1508,7 @@ async function rackRemovePlate(idx){
 }
 async function rackClearPrint(idx){
   const r=await api('POST',`/api/rack/slot/${idx+1}/clear_print`);
-  if(r){rackState=r;renderRack();updateJobSlotSelects();toast('ok',`Slot ${idx+1} cleared — blocked slots freed ✓`);}
+  if(r){rackState=r;renderRack();updateJobSlotSelects();toast('ok',`${t('toast.slot_cleared').replace('{n}', idx+1)} ✓`);}
 }
 
 // ── JOBS TAB ──────────────────────────────────────────────────────────────────
@@ -1087,17 +1589,17 @@ function checkPark(bottomIdx, slotsNeeded, allowGrabIdx){
   const numSlots=rackState.num_slots||6;
   const blocked=blockedIndices();
   const last=numSlots-1;
-  if(bottomIdx<0||bottomIdx>=numSlots) return 'Invalid slot';
+  if(bottomIdx<0||bottomIdx>=numSlots) return t('jobs.err_invalid_slot');
   for(let k=0;k<slotsNeeded;k++){
     const idx=bottomIdx+k;
     if(idx>last) continue; // open rack above the top slot
-    if(blocked.has(idx)) return `Slot ${idx+1} is blocked by another print`;
+    if(blocked.has(idx)) return `${t('jobs.err_slot_blocked').replace('{n}', idx+1)}`;
     const s=(rackState.slots||[])[idx]||{state:'empty'};
     if(k===0){
-      if(s.state==='ready' && idx!==allowGrabIdx) return `Slot ${idx+1} already has a plate`;
-      if(!['empty','ready','grab_reserved'].includes(s.state) && idx!==allowGrabIdx) return `Slot ${idx+1} is not available`;
+      if(s.state==='ready' && idx!==allowGrabIdx) return `${t('jobs.err_slot_has_plate').replace('{n}', idx+1)}`;
+      if(!['empty','ready','grab_reserved'].includes(s.state) && idx!==allowGrabIdx) return `${t('jobs.err_slot_unavailable').replace('{n}', idx+1)}`;
     }else{
-      if(s.state!=='empty') return `Slot ${idx+1} is occupied`;
+      if(s.state!=='empty') return `${t('jobs.err_slot_occupied').replace('{n}', idx+1)}`;
     }
   }
   return null;
@@ -1114,9 +1616,9 @@ function updateJobSlotSelects(){
   const slotsNeeded=lastAnalysis?Math.max(1,lastAnalysis.slots_needed):1;
 
   // Grab: only 'ready' slots
-  grabSel.innerHTML='<option value="">— select —</option>';
+  grabSel.innerHTML=`<option value="">${t('common.select')}</option>`;
   for(let i=0;i<numSlots;i++){
-    if(slots[i]?.state==='ready') grabSel.innerHTML+=`<option value="${i+1}">Slot ${i+1}</option>`;
+    if(slots[i]?.state==='ready') grabSel.innerHTML+=`<option value="${i+1}">${t('jobs.slot_n').replace('{n}', i+1)}</option>`;
   }
   if(curGrab)grabSel.value=curGrab;
 
@@ -1124,13 +1626,13 @@ function updateJobSlotSelects(){
   const grabIdx=grabN?grabN-1:null;
 
   // Park: any bottom slot where checkPark succeeds (treating grabIdx as available)
-  parkSel.innerHTML='<option value="">— select —</option>';
+  parkSel.innerHTML=`<option value="">${t('common.select')}</option>`;
   for(let i=0;i<numSlots;i++){
     const err=checkPark(i, slotsNeeded, grabIdx);
     if(err===null){
       const isGrab=(i===grabIdx);
-      const lbl=isGrab?`Slot ${i+1} ↺ (freed after grab)`:`Slot ${i+1}`;
-      const extra=slotsNeeded>1?` +${slotsNeeded-1} slot${slotsNeeded>2?'s':''}`:'';
+      const lbl=isGrab?`${t('jobs.slot_n').replace('{n}', i+1)} ↺ (${t('jobs.freed_after_grab')})`:`${t('jobs.slot_n').replace('{n}', i+1)}`;
+      const extra=slotsNeeded>1?` +${slotsNeeded-1} ${t('jobs.slot_unit').replace('{n}', slotsNeeded-1)}`:'';
       parkSel.innerHTML+=`<option value="${i+1}">${lbl}${extra}</option>`;
     }
   }
@@ -1184,8 +1686,8 @@ function updateJobSlotPreview(){
     html+=`<div style="width:22px;height:22px;border-radius:2px;border:1px solid ${brd};background:${bg};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:${col};font-family:var(--mono)">${n}</div>`;
   }
   let label;
-  if(sameSlot) label=`Slot ${grabN}: pick → print → store back`;
-  else label=`${grabN?`Slot ${grabN} pick → `:''}Slot ${parkN} park${slotsNeeded>1?` (+${slotsNeeded-1})`:''}`;
+  if(sameSlot) label=`${t('jobs.slot_n').replace('{n}', grabN)}: ${t('jobs.pick_print_store_back')}`;
+  else label=`${grabN?`${t('jobs.slot_n').replace('{n}', grabN)} ${t('jobs.pick_arrow')} `:''}${t('jobs.slot_n').replace('{n}', parkN)} ${t('jobs.park_label')}${slotsNeeded>1?` (+${slotsNeeded-1})`:''}`;
   html+=`<span style="font-size:10px;color:var(--muted);margin-left:8px">${label}</span>`;
   inner.innerHTML=html;
 
@@ -1194,13 +1696,13 @@ function updateJobSlotPreview(){
 
 function buildJobPayload(){
   const pid=v('job-printer');
-  if(!pid){toast('err','Please select a printer');return null;}
-  if(!lastAnalysis){toast('err','Please drop a .gcode/.3mf file first');return null;}
+  if(!pid){toast('err',t('toast.select_printer'));return null;}
+  if(!lastAnalysis){toast('err',t('toast.drop_file_first'));return null;}
   const plateInPrinter=document.getElementById('job-plate-in-printer').checked;
   const grabN=plateInPrinter?null:(+document.getElementById('job-grab-slot')?.value||null);
   const parkN=+document.getElementById('job-park-slot')?.value||null;
-  if(!plateInPrinter&&!grabN){toast('err','Please select a pick slot');return null;}
-  if(!parkN){toast('err','Please select a park slot');return null;}
+  if(!plateInPrinter&&!grabN){toast('err',t('toast.select_pick_slot'));return null;}
+  if(!parkN){toast('err',t('toast.select_park_slot'));return null;}
   const slotsNeeded=Math.max(1,lastAnalysis.slots_needed);
   const err=checkPark(parkN-1, slotsNeeded, grabN?grabN-1:null);
   if(err){toast('err',err);return null;}
@@ -1223,7 +1725,7 @@ async function addQueue(){
   const r=buildJobPayload();if(!r)return;
   const job=await api('POST','/api/jobs',r);
   if(job){
-    toast('info',`${r.filename} queued — slots locked${r.slots_needed>1?` (+${r.slots_needed-1})`:''}`);
+    toast('info',`${r.filename} ${t('toast.queued_slots_locked')}${r.slots_needed>1?` (+${r.slots_needed-1})`:''}`);
     lastAnalysis=null;
     document.getElementById('job-file-info').style.display='none';
     await loadRackAndJobs();
@@ -1248,17 +1750,17 @@ async function delJob(id){
 
 function renderJobs(){
   const el=document.getElementById('job-list');if(!el)return;
-  if(!jobsState.length){el.innerHTML='<div style="color:var(--muted);font-size:11px;padding:10px">Queue is empty.</div>';return;}
+  if(!jobsState.length){el.innerHTML=`<div style="color:var(--muted);font-size:11px;padding:10px">${t('jobs.queue_empty')}</div>`;return;}
 
   el.innerHTML=jobsState.map(j=>{
     const p=S[j.printer_id];
-    const grabLbl=j.grab_slot?`Slot ${j.grab_slot}`:'In printer';
-    const parkLbl=j.park_slot?`Slot ${j.park_slot}${j.slots_needed>1?` (+${j.slots_needed-1})`:''}`:'—';
+    const grabLbl=j.grab_slot?`${t('jobs.slot_n').replace('{n}', j.grab_slot)}`:t('jobs.in_printer');
+    const parkLbl=j.park_slot?`${t('jobs.slot_n').replace('{n}', j.park_slot)}${j.slots_needed>1?` (+${j.slots_needed-1})`:''}`:'—';
     const same=j.grab_slot&&j.park_slot&&j.grab_slot===j.park_slot;
     const isActive=j.status==='running';
     const cls=isActive?'active':j.status==='done'?'done':j.status==='error'?'error':(j.status==='aborted'||j.status==='skipped')?'aborted':'';
     const badgeCls={queued:'badge-queued',running:'badge-running',done:'badge-done',error:'badge-error',aborted:'badge-aborted',skipped:'badge-skipped'}[j.status]||'badge-queued';
-    const badgeLbl={queued:'Waiting',running:'Running',done:'Done',error:'Error',aborted:'Aborted',skipped:'Skipped'}[j.status]||j.status;
+    const badgeLbl={queued:t('jobs.badge_waiting'),running:t('jobs.badge_running'),done:t('jobs.badge_done'),error:t('jobs.badge_error'),aborted:t('jobs.badge_aborted'),skipped:t('jobs.badge_skipped')}[j.status]||j.status;
     const canRemove=(queueState.state==='idle')&&j.status==='queued';
     return`<div class="job-card ${cls}">
       <div class="job-head">
@@ -1273,7 +1775,7 @@ function renderJobs(){
         <span>→</span>
         <span style="color:var(--yel)">⬇ ${parkLbl}</span>
         ${same?'<span style="color:var(--acc)">↺</span>':''}
-        ${j.retry_from_print?'<span style="color:var(--blu);font-size:9px">↺ retry from print</span>':''}
+        ${j.retry_from_print?`<span style="color:var(--blu);font-size:9px">↺ ${t('jobs.retry_from_print_hint')}</span>`:''}
       </div>
     </div>`;
   }).join('');
@@ -1281,16 +1783,19 @@ function renderJobs(){
 
 // ── QUEUE AUTOMATION UI ──────────────────────────────────────────────────────
 const ALL_STEPS={
-  grab:  {label:'Pick plate from rack',    macro:j=>`GRAB_FROM_SLOT_${j.grab_slot}`},
-  load:  {label:'Load plate onto printer', macro:j=>(S[j.printer_id]?.macros?.load)||'—'},
-  print: {label:'Start print',             macro:()=>'project_file / SDCARD_PRINT_FILE'},
-  wait:  {label:'Wait for print to finish',macro:()=>'Status → FINISH'},
-  move:  {label:'Move axis to safe pos.',  macro:j=>{const p=S[j.printer_id];const cx=p&&COREXY_MODELS.has(p.model);return cx?'G1 Z200 F3000 (printer)':'G1 Y[Ymax] F6000 (printer)';}},
-  eject: {label:'Eject print plate',       macro:j=>(S[j.printer_id]?.macros?.eject)||'—'},
-  store: {label:'Store plate in rack',     macro:j=>`STORE_TO_SLOT_${j.park_slot}`},
+  grab_parallel: {labelKey:'step.grab_parallel', macro:j=>`GRAB_FROM_SLOT_${j.grab_slot} (parallel)`},
+  load:         {labelKey:'step.load',         macro:j=>(S[j.printer_id]?.macros?.load)||'—'},
+  park1_upload: {labelKey:'step.park1_upload', macro:()=>'PARK_OTTOEJECT + upload (parallel)'},
+  upload:       {labelKey:'step.upload',       macro:j=>j.filename},
+  print:        {labelKey:'step.print',        macro:()=>'project_file / SDCARD_PRINT_FILE'},
+  wait_finish:  {labelKey:'step.wait_finish',  macro:()=>'Status → FINISH'},
+  move:         {labelKey:'step.move',         macro:j=>{const p=S[j.printer_id];const cx=p&&COREXY_MODELS.has(p.model);return cx?'G1 Z200 F3000 (printer)':'G1 Y[Ymax] F6000 (printer)';}},
+  wait_idle:    {labelKey:'step.wait_idle',    macro:()=>'Status → IDLE'},
+  eject:        {labelKey:'step.eject',        macro:j=>(S[j.printer_id]?.macros?.eject)||'—'},
+  store:        {labelKey:'step.store',        macro:j=>`STORE_TO_SLOT_${j.park_slot}`},
 };
-const STEPS_FULL=['grab','load','print','wait','move','eject','store'];
-const STEPS_NOPLATE=['print','wait','move','eject','store'];
+const STEPS_FULL   =['grab_parallel','load','park1_upload','print','wait_finish','move','wait_idle','eject','store'];
+const STEPS_NOPLATE=['upload','print','wait_finish','move','wait_idle','eject','store'];
 
 function renderQueueUI(){
   document.getElementById('btn-q-start').style.display = queueState.state==='idle'?'':'none';
@@ -1304,10 +1809,10 @@ function renderQueueUI(){
   const aborted=jobsState.filter(j=>j.status==='aborted'||j.status==='skipped').length;
   const total=jobsState.length;
   document.getElementById('queue-counters').innerHTML=
-    `<span><b>${waiting}</b>waiting</span>`+
-    `<span><b>${done}</b>done</span>`+
-    (aborted?`<span><b>${aborted}</b>aborted/skipped</span>`:'')+
-    `<span><b>${total}</b>total</span>`;
+    `<span><b>${waiting}</b>${t('jobs.counter_waiting')}</span>`+
+    `<span><b>${done}</b>${t('jobs.counter_done')}</span>`+
+    (aborted?`<span><b>${aborted}</b>${t('jobs.counter_aborted_skipped')}</span>`:'')+
+    `<span><b>${total}</b>${t('jobs.counter_total')}</span>`;
 
   const banner=document.getElementById('q-error-banner');
   const activeWrap=document.getElementById('active-job-wrap');
@@ -1336,8 +1841,8 @@ function renderActiveJob(){
   if(!job){document.getElementById('active-job-wrap').style.display='none';return;}
   document.getElementById('aj-name').textContent=job.filename;
   document.getElementById('aj-height').textContent=job.height_mm?`${job.height_mm.toFixed(1)}mm`:'';
-  document.getElementById('aj-grab').textContent=job.grab_slot?`Slot ${job.grab_slot}`:'In printer';
-  document.getElementById('aj-park').textContent=`Slot ${job.park_slot}${job.slots_needed>1?` (+${job.slots_needed-1})`:''}`;
+  document.getElementById('aj-grab').textContent=job.grab_slot?`${t('jobs.slot_n').replace('{n}', job.grab_slot)}`:t('jobs.in_printer');
+  document.getElementById('aj-park').textContent=`${t('jobs.slot_n').replace('{n}', job.park_slot)}${job.slots_needed>1?` (+${job.slots_needed-1})`:''}`;
 
   const badge=document.getElementById('aj-badge');
   if(queueState.state==='error'){badge.textContent='Error';badge.className='badge badge-error';}
@@ -1364,7 +1869,7 @@ function renderActiveJob(){
     return`<div class="step-row">
       <div class="step-num ${cls}">${skipped?'—':isDone?'✓':isActive?(isAbort?'✕':'→'):i+1}</div>
       <div style="flex:1">
-        <div style="font-size:10px;color:${isActive?'var(--txt)':'var(--muted)'};${skipped?'text-decoration:line-through;opacity:.4':''}">${info.label}${skipped?' (done)':''}</div>
+        <div style="font-size:10px;color:${isActive?'var(--txt)':'var(--muted)'};${skipped?'text-decoration:line-through;opacity:.4':''}">${t(info.labelKey)}${skipped?` (${t('step.done_suffix')})`:''}</div>
         <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">${info.macro(job)}</div>
       </div>
       ${isActive&&!isAbort?'<span style="font-size:9px;color:var(--yel)">⟳</span>':''}
@@ -1393,7 +1898,7 @@ async function queueResume(){
 }
 async function queueStop(){
   const r=await api('POST','/api/queue/stop');
-  if(r){queueState=r;await loadRackAndJobs();renderQueueUI();toast('info','Queue stopped — slots freed');}
+  if(r){queueState=r;await loadRackAndJobs();renderQueueUI();toast('info',t('toast.queue_stopped'));}
 }
 async function queueRetry(){
   const r=await api('POST','/api/queue/retry');
@@ -1414,7 +1919,7 @@ function onEjectPrinter(){
   const p=pid?S[pid]:null;const m=p?.macros||{};
   setText('ej-eject-macro',m.eject||'—');setText('ej-eject-lbl',m.eject||'—');
   setText('ej-load-macro',m.load||'—');setText('ej-load-lbl',m.load||'—');
-  setText('ej-door-macro',m.close_door||'not available');setText('ej-door-lbl',m.close_door||'—');
+  setText('ej-door-macro',m.close_door||t('eject.not_available'));setText('ej-door-lbl',m.close_door||'—');
   const db=document.getElementById('door-btn');
   db.style.opacity=m.close_door?'1':'0.4';
   db.style.pointerEvents=m.close_door?'auto':'none';
@@ -1425,24 +1930,24 @@ function onEjectPrinter(){
     const moveCmd=isCoreXY?'G1 Z200 F3000':`G1 Y${Y_MAX_MM[p.model]||210} F6000`;
     seq.innerHTML=`1. ${moveCmd} → printer<br>2. M400 → printer<br>3. ${esc(m.eject||'—')} → Klipper<br>4. STORE_TO_SLOT_N → Klipper`;
   }else{
-    seq.textContent='Select a printer to see the eject sequence.';
+    seq.textContent=t('eject.select_printer_hint');
   }
 }
 
 async function runEject(){
-  const pid=document.getElementById('eject-printer').value;if(!pid){toast('err','Please select a printer');return;}
+  const pid=document.getElementById('eject-printer').value;if(!pid){toast('err',t('toast.select_printer'));return;}
   const r=await api('POST',`/api/ottoeject/eject/${pid}`);
-  if(r?.ok)toast('ok','Eject sequence sent ✓');
+  if(r?.ok)toast('ok',`${t('toast.eject_sent')} ✓`);
 }
 async function runLoad(){
-  const pid=document.getElementById('eject-printer').value;if(!pid){toast('err','Please select a printer');return;}
+  const pid=document.getElementById('eject-printer').value;if(!pid){toast('err',t('toast.select_printer'));return;}
   const r=await api('POST',`/api/ottoeject/load/${pid}`);
-  if(r?.ok)toast('ok','Load macro sent ✓');
+  if(r?.ok)toast('ok',`${t('toast.load_sent')} ✓`);
 }
 async function runDoor(){
   const pid=document.getElementById('eject-printer').value;if(!pid)return;
   const r=await api('POST',`/api/ottoeject/close_door/${pid}`);
-  if(r?.ok)toast('ok','Door macro sent ✓');
+  if(r?.ok)toast('ok',`${t('toast.door_sent')} ✓`);
 }
 async function runCustom(){
   const m=document.getElementById('custom-macro').value.trim();if(!m)return;
@@ -1458,7 +1963,7 @@ async function loadKlipper(){
     el.innerHTML=`<div class="kv-row"><span class="kv-key">Status</span><span>${esc(r.state||'—')}</span></div>
       <div class="kv-row"><span class="kv-key">Hostname</span><span>${esc(r.hostname||'—')}</span></div>
       <div class="kv-row"><span class="kv-key">Klipper</span><span>${esc(r.software_version||'—')}</span></div>`;
-  }else{el.innerHTML='<div style="color:var(--red);font-size:11px">Moonraker not reachable</div>';}
+  }else{el.innerHTML=`<div style="color:var(--red);font-size:11px">${t('eject.moonraker_unreachable')}</div>`;}
 }
 
 // ── GCODE CONSOLE ────────────────────────────────────────────────────────────
@@ -1470,7 +1975,7 @@ async function sendGcode(){
 }
 async function qg(cmd){
   const pid=document.getElementById('console-printer').value;
-  if(!pid){toast('err','Please select a printer');return;}
+  if(!pid){toast('err',t('toast.select_printer'));return;}
   logG(cmd,'sent');await api('POST','/api/gcode',{printer_id:pid,command:cmd});
 }
 
@@ -1492,7 +1997,7 @@ function updateCalibHint(){
 
 async function sendCalibMove(){
   const pid=document.getElementById('console-printer').value;
-  if(!pid){toast('err','Please select a printer');return;}
+  if(!pid){toast('err',t('toast.select_printer'));return;}
   const printer=S[pid];
   const model=printer?.model||'';
   const isCoreXY=COREXY_MODELS.has(model);
@@ -1523,14 +2028,14 @@ function updateSnippet(){
 }
 async function copySnippet(){
   await navigator.clipboard.writeText(document.getElementById('mainsail-snippet').textContent).catch(()=>{});
-  toast('ok','Copied');
+  toast('ok',t('toast.copied'));
 }
 
 // ── UTILS ────────────────────────────────────────────────────────────────────
 async function api(method,path,body){
   try{
     const r=await fetch(path,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
-    if(!r.ok){const e=await r.json().catch(()=>({detail:r.statusText}));toast('err',e.detail||`Error ${r.status}`);return null;}
+    if(!r.ok){const e=await r.json().catch(()=>({detail:r.statusText}));toast('err',e.detail||`${t('common.error')} ${r.status}`);return null;}
     return await r.json();
   }catch(e){toast('err',e.message);return null;}
 }
@@ -1547,6 +2052,7 @@ function toast(type,msg){
 }
 
 const TAB_TITLES={dashboard:'Dashboard',files:'Files',jobs:'Jobs',eject:'OttoEject',rack:'Rack',console:'Console',settings:'Settings'};
+const TAB_TITLE_KEYS={dashboard:'nav.dashboard',files:'nav.files',jobs:'nav.jobs',eject:null,rack:'nav.rack',console:'nav.console',settings:'nav.settings'};
 
 function switchTab(name){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
@@ -1554,7 +2060,8 @@ function switchTab(name){
   document.getElementById('tab-'+name).classList.add('active');
   const idx=TAB_NAMES.indexOf(name);
   if(idx>=0)document.querySelectorAll('.sidebar-nav button')[idx].classList.add('active');
-  document.getElementById('topbar-title').textContent=TAB_TITLES[name]||name;
+  const key=TAB_TITLE_KEYS[name];
+  document.getElementById('topbar-title').textContent=key?t(key):(TAB_TITLES[name]||name);
   document.getElementById('sidebar').classList.remove('open');
   if(name==='files')loadFiles();
   if(name==='jobs'){loadFiles();loadRackAndJobs();refreshQueue();}
