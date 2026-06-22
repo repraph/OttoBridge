@@ -148,6 +148,20 @@ def get_close_door_macro(brand, model):
     if "k1c" in m:                        return "CLOSE_DOOR_CREALITY_K_ONE_C"
     return None
 
+def get_open_door_macro(brand, model):
+    """NOTE: the community configs only define a single generic _OPEN_DOOR
+    macro (internal, prefixed with underscore) — there is no per-printer
+    OPEN_DOOR_<PRINTER> macro like there is for CLOSE_DOOR_<PRINTER>.
+    _OPEN_DOOR reads its door_x_start/door_y_start/door_z_engage/door_d_to_pin_dist
+    variables via SET_GCODE_VARIABLE calls that live inside each printer's
+    EJECT_FROM_<PRINTER> macro — so calling _OPEN_DOOR standalone before any
+    EJECT_FROM_<PRINTER> call has run will use stale/unset variables.
+    Until the configs expose a proper per-printer OPEN_DOOR_<PRINTER> macro,
+    this returns None and the queue runner falls back to skipping the
+    explicit pre-open-door step (the printer's own EJECT_FROM_<PRINTER>
+    macro already opens the door as part of every later cycle)."""
+    return None
+
 # ── Printer state ──────────────────────────────────────────────────────────────
 class PrinterState:
     def __init__(self):
@@ -531,6 +545,11 @@ def ftp_upload_sync(pid, local_path, remote_name):
         with ftplib.FTP_TLS(context=ctx) as ftp:
             ftp.connect(p.ip, 990, timeout=30); ftp.login("bblp", p.access_code); ftp.prot_p()
             with open(local_path, "rb") as f: ftp.storbinary(f"STOR {remote_name}", f)
+            # NOOP confirms the server has fully acknowledged the transfer before
+            # we close the TCP session. Without this the X1C firmware may still be
+            # writing to its internal storage when the connection drops, causing
+            # a 0500-4003 "cannot process file" error on the next project_file command.
+            ftp.voidcmd("NOOP")
         return True
     except Exception as e: log.error(f"[{p.name}] FTP: {e}"); return False
 
@@ -972,21 +991,36 @@ async def del_file(filename: str):
 # Job lifecycle: queued -> running -> done | error | aborted | skipped
 # All jobs remain in `jobs` for history; only `queued` jobs can be removed while idle.
 #
-# Execution sequence per job (with grab_slot set):
-#   1. GRAB_FROM_SLOT_<grab>        (Moonraker/Klipper)
-#   2. LOAD_ONTO_<PRINTER>          (Moonraker/Klipper)
-#   3. start_print (file)           (printer protocol)
-#   4. wait for status FINISH       (poll)
-#   5. move axis to safe pos + M400 (printer protocol, sent to printer)
-#   6. EJECT_FROM_<PRINTER>         (Moonraker/Klipper)
-#   7. STORE_TO_SLOT_<park>         (Moonraker/Klipper)
+# Once per queue start (before the first job runs):
+#   0a. OTTOEJECT_HOME              (Moonraker/Klipper)
+#   0b. printer home (G28)          (printer protocol)
 #
-# If grab_slot is None (plate already in printer), steps 1-2 are skipped.
-# On retry after an error during/after printing, steps 1-2 are also skipped
-# (the plate is already on the bed) — retry restarts from step 3.
+# Execution sequence per job (with grab_slot set):
+#   1. parallel:
+#        - OPEN_DOOR (only for the very first job of the queue, door-equipped printers)
+#        - move printer axis to safe position (printer protocol)
+#        - GRAB_FROM_SLOT_<grab>     (Moonraker/Klipper)
+#   2. wait until printer reports IDLE, then:
+#      LOAD_ONTO_<PRINTER>           (Moonraker/Klipper — also closes the door)
+#   3. PARK_OTTOEJECT                (Moonraker/Klipper)
+#   4. start_print (file)            (printer protocol)
+#   5. wait for status FINISH        (poll)
+#   6. move axis to safe pos + M400  (printer protocol, sent to printer)
+#   7. wait until printer reports IDLE
+#   8. EJECT_FROM_<PRINTER>          (Moonraker/Klipper — also opens the door)
+#   9. STORE_TO_SLOT_<park>          (Moonraker/Klipper)
+#  10. PARK_OTTOEJECT                (Moonraker/Klipper)
+#
+# After the last job in the queue finishes (no more queued jobs left):
+#   CLOSE_DOOR is sent so the printer doesn't sit with an open door indefinitely.
+#   If more jobs remain queued, the door is left open for the next cycle.
+#
+# If grab_slot is None (plate already in printer), steps 1-3 are skipped.
+# On retry after an error during/after printing, steps 1-3 are also skipped
+# (the plate is already on the bed) — retry restarts from step 4.
 
-STEPS_FULL = ["grab", "load", "print", "wait", "move", "eject", "store"]
-STEPS_NOPLATE = ["print", "wait", "move", "eject", "store"]
+STEPS_FULL    = ["grab_parallel", "load", "park1_upload", "print", "wait_finish", "move", "wait_idle", "eject", "store"]
+STEPS_NOPLATE = ["upload", "print", "wait_finish", "move", "wait_idle", "eject", "store"]
 
 class QueueManager:
     def __init__(self):
@@ -996,6 +1030,8 @@ class QueueManager:
         self.retry_from_print = False
         self.error_msg = ""
         self.task: Optional[asyncio.Task] = None
+        self.home_done = False      # OTTOEJECT_HOME + printer home — once per queue start
+        self.door_opened_job_id: Optional[str] = None  # which job's OPEN_DOOR already ran
 
     def _steps(self, job: dict) -> list[str]:
         if job.get("grab_slot") and not (self.retry_from_print and job["id"] == self.cur_job_id):
@@ -1022,6 +1058,8 @@ class QueueManager:
         self.cur_step_idx = 0
         self.retry_from_print = False
         self.error_msg = ""
+        self.home_done = False
+        self.door_opened_job_id = None
         self.task = asyncio.create_task(self._run())
         return True
 
@@ -1103,6 +1141,17 @@ class QueueManager:
 
     async def _run(self):
         try:
+            if not self.home_done:
+                job0 = next((j for j in jobs if j["id"] == self.cur_job_id), None)
+                if job0:
+                    ok = await self._home_for_queue_start(job0)
+                    if not ok:
+                        self.state = "error"
+                        self.error_msg = "Homing failed at queue start"
+                        await broadcast("queue", self.to_dict())
+                        return
+                self.home_done = True
+
             while self.state == "running":
                 job = next((j for j in jobs if j["id"] == self.cur_job_id), None)
                 if not job:
@@ -1126,6 +1175,17 @@ class QueueManager:
                         await asyncio.sleep(1)
                         continue
                     else:
+                        # Last job done — close door then park the arm.
+                        p = printers.get(job["printer_id"])
+                        if p:
+                            m = get_close_door_macro(p.brand, p.model)
+                            if m:
+                                try: await _run_klipper(m)
+                                except Exception as e:
+                                    log.warning(f"Failed to close door at queue end: {e}")
+                        try: await _run_klipper("PARK_OTTOEJECT")
+                        except Exception as e:
+                            log.warning(f"Failed to park OttoEject at queue end: {e}")
                         self.state = "idle"
                         self.cur_job_id = None
                         await broadcast("queue", self.to_dict())
@@ -1143,34 +1203,75 @@ class QueueManager:
         except asyncio.CancelledError:
             raise
 
+    async def _home_for_queue_start(self, job: dict) -> bool:
+        """Runs once per queue start, before the first job's steps:
+        1. OTTOEJECT_HOME (Moonraker/Klipper)
+        2. Printer home (G28, sent to the printer itself)"""
+        try:
+            r = await _run_klipper("OTTOEJECT_HOME")
+            if not r.get("ok"): return False
+            pid = job["printer_id"]
+            ok = await _send_printer_gcode(pid, "G28")
+            return ok
+        except Exception as e:
+            log.error(f"Queue-start homing failed: {e}")
+            return False
+
     async def _exec_step(self, job: dict, step: str) -> bool:
         pid = job["printer_id"]
         p = printers.get(pid)
         if not p: return False
         try:
-            if step == "grab":
-                r = await _run_klipper(f"GRAB_FROM_SLOT_{job['grab_slot']}")
-                return bool(r.get("ok"))
+            if step == "grab_parallel":
+                # Phase 1 (parallel): open door + move to safe pos.
+                # These two can run simultaneously — neither moves toward the plate.
+                # Door open is only needed for the very first job of the queue;
+                # later jobs already have the door open from the previous EJECT_FROM_<PRINTER>.
+                is_first_job = (self.door_opened_job_id is None)
+                phase1 = [self._move_to_safe_pos(pid, p)]
+                if is_first_job and has_door(p.brand, p.model):
+                    phase1.append(self._open_door(p))
+                    self.door_opened_job_id = job["id"]
+                results1 = await asyncio.gather(*phase1, return_exceptions=True)
+                if not all((r is True) for r in results1):
+                    return False
+                # Phase 2 (sequential): grab only after door is confirmed open
+                return await self._grab_from_slot(job)
             if step == "load":
+                if not await self._wait_for_idle(pid): return False
                 m = get_load_macro(p.brand, p.model)
                 if not m: return True  # no load macro defined -> skip
                 r = await _run_klipper(m)
                 return bool(r.get("ok"))
+            if step == "park1_upload":
+                # PARK_OTTOEJECT and file upload run in parallel —
+                # both are independent and neither blocks the other.
+                park_task   = _run_klipper("PARK_OTTOEJECT")
+                upload_task = self._upload_file(job, p)
+                results = await asyncio.gather(park_task, upload_task, return_exceptions=True)
+                park_ok   = isinstance(results[0], dict) and results[0].get("ok")
+                upload_ok = results[1] is True
+                return park_ok and upload_ok
+            if step == "upload":
+                return await self._upload_file(job, p)
             if step == "print":
                 req = StartPrint(**{k: v for k, v in job.items()
                                      if k in StartPrint.model_fields})
+                # Bambu X1C/P1S: give the printer filesystem a moment to fully
+                # settle after FTP before sending project_file via MQTT.
+                # Avoids 0500-4003 "cannot process file" errors seen when the
+                # command arrives while the firmware is still flushing the write.
+                if p and p.protocol == "mqtt_ftp":
+                    await asyncio.sleep(5)
                 await start_print(req)
                 return True
-            if step == "wait":
+            if step == "wait_finish":
                 return await self._wait_for_finish(pid)
             if step == "move":
-                if p.model in COREXY_MODELS:
-                    move_cmd = "G1 Z200 F3000"
-                else:
-                    move_cmd = f"G1 Y{CARTESIAN_YMAX.get(p.model, 210)} F6000"
-                await _send_printer_gcode(pid, move_cmd)
-                await _send_printer_gcode(pid, "M400")
+                await self._move_to_safe_pos(pid, p)
                 return True
+            if step == "wait_idle":
+                return await self._wait_for_idle(pid)
             if step == "eject":
                 m = get_eject_macro(p.brand, p.model)
                 if not m: return False
@@ -1184,14 +1285,112 @@ class QueueManager:
             return False
         return False
 
+    async def _move_to_safe_pos(self, pid: str, p) -> bool:
+        if p.model in COREXY_MODELS:
+            move_cmd = "G1 Z200 F3000"
+        else:
+            move_cmd = f"G1 Y{CARTESIAN_YMAX.get(p.model, 210)} F6000"
+        await _send_printer_gcode(pid, move_cmd)
+        await _send_printer_gcode(pid, "M400")
+        return True
+
+    async def _grab_from_slot(self, job: dict) -> bool:
+        r = await _run_klipper(f"GRAB_FROM_SLOT_{job['grab_slot']}")
+        return bool(r.get("ok"))
+
+    async def _upload_file(self, job: dict, p) -> bool:
+        """Transfer the job file from OttoBridge's uploads/ to the printer."""
+        fname = job["filename"]
+        local = UPLOAD_DIR / fname
+        if not local.exists():
+            log.error(f"Upload failed: {local} not found in uploads/")
+            return False
+        loop = asyncio.get_event_loop()
+        if p.protocol == "mqtt_ftp":
+            ok = await loop.run_in_executor(None, ftp_upload_sync, p.id, str(local), fname)
+        elif p.protocol == "prusalink":
+            ok = await prusa_upload(p.id, str(local), fname)
+        elif p.protocol in ("moonraker", "websocket", "websocket_elegoo"):
+            ok = await moonraker_upload(p.id, str(local), fname)
+        elif p.protocol == "http_tcp":
+            try:
+                async with httpx.AsyncClient(timeout=60) as c:
+                    with open(local, "rb") as f:
+                        r = await c.post(
+                            f"http://{p.ip}:8898/upload",
+                            files={"file": (fname, f, "application/octet-stream")},
+                            data={"serialNumber": p.serial_code, "checkCode": p.check_code},
+                        )
+                ok = r.status_code == 200
+            except Exception as e:
+                log.error(f"FlashForge upload failed: {e}")
+                ok = False
+        else:
+            log.warning(f"No upload method for protocol {p.protocol!r}, skipping")
+            ok = True
+        if not ok:
+            log.error(f"Upload of {fname!r} to {p.name} failed")
+        return ok
+
+    async def _open_door(self, p) -> bool:
+        """Open the printer door standalone, before any EJECT_FROM_<PRINTER>
+        has run in this Klipper session. The door coordinates are fixed
+        values already stored in _PRINTER_VARS (printer_calibration_variables.cfg).
+        Jinja2 templating ({% %} / { }) only evaluates inside a gcode_macro
+        definition in the config file — it is NOT evaluated in a raw script
+        sent via Moonraker's gcode/script endpoint. So we first read the
+        literal values via Moonraker's objects/query, then send plain
+        SET_GCODE_VARIABLE commands with those literal numbers, exactly
+        mirroring what each EJECT_FROM_<PRINTER> macro does internally."""
+        try:
+            async with httpx.AsyncClient(timeout=10) as c:
+                r = await c.get(f"{MOONRAKER_URL}/printer/objects/query",
+                                 params={"gcode_macro _PRINTER_VARS": ""})
+            data = r.json().get("result", {}).get("status", {}).get("gcode_macro _PRINTER_VARS", {})
+            x_start = data.get("x_start"); y_start = data.get("y_start")
+            z_engage = data.get("z_engage"); d_pin_dist = data.get("d_pin_dist")
+            if None in (x_start, y_start, z_engage, d_pin_dist):
+                log.error("_PRINTER_VARS missing door coordinates (x_start/y_start/z_engage/d_pin_dist)")
+                return False
+        except Exception as e:
+            log.error(f"Failed to query _PRINTER_VARS for door open: {e}")
+            return False
+
+        gcode = (
+            f"SET_GCODE_VARIABLE MACRO=_OPEN_DOOR VARIABLE=door_x_start VALUE={x_start}\n"
+            f"SET_GCODE_VARIABLE MACRO=_OPEN_DOOR VARIABLE=door_y_start VALUE={y_start}\n"
+            f"SET_GCODE_VARIABLE MACRO=_OPEN_DOOR VARIABLE=door_z_engage VALUE={z_engage}\n"
+            f"SET_GCODE_VARIABLE MACRO=_OPEN_DOOR VARIABLE=door_d_to_pin_dist VALUE={d_pin_dist}\n"
+            "_OPEN_DOOR"
+        )
+        r = await _run_klipper(gcode)
+        return bool(r.get("ok"))
+
+    async def _wait_for_idle(self, pid: str) -> bool:
+        """Poll printer status until IDLE."""
+        while True:
+            if self.state != "running": return False
+            p = printers.get(pid)
+            if not p: return False
+            if p.status in ("IDLE", "FINISH"): return True
+            if p.status in ("FAILED", "CANCELLED", "STOPPED"): return False
+            await asyncio.sleep(2)
+
     async def _wait_for_finish(self, pid: str) -> bool:
-        """Poll printer status until FINISH (success) or FAILED/CANCELLED (error)."""
+        """Poll printer status until FINISH (success) or FAILED/CANCELLED (error).
+        For Bambu printers, also watches print_error — the X1C sets a non-zero
+        error code (e.g. 0500-4003) before gcode_state flips to FAILED, so we
+        catch it early to avoid the queue hanging on a stalled RUNNING status."""
         while True:
             if self.state != "running": return False
             p = printers.get(pid)
             if not p: return False
             if p.status == "FINISH": return True
             if p.status in ("FAILED", "CANCELLED", "STOPPED"): return False
+            # Bambu-specific: catch print errors before status flips
+            if p.protocol == "mqtt_ftp" and p.print_error not in ("0", "", "0x0", None):
+                log.error(f"[{p.name}] print_error={p.print_error} detected — treating as FAILED")
+                return False
             await asyncio.sleep(3)
 
 queue_mgr = QueueManager()
