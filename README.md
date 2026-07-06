@@ -10,7 +10,7 @@ Lightweight web orchestrator for 3D print farms with OttoEject rack automation. 
 
 OttoBridge is inspired by and built for the [OttoEject](https://www.ottomat3d.com/) hardware ecosystem by [OTTOMAT3D](https://www.ottomat3d.com/) — a 6-slot automated storage rack and pick-and-place system for 3D printers. OttoBridge is an independent, community-built orchestrator and is not affiliated with or endorsed by OTTOMAT3D.
 
-NOTE: This is still work in progress. It has not been tested yet. Use at youur own risk.
+NOTE: This is still work in progress. It has not been tested yet. Use at your own risk.
 
 ---
 
