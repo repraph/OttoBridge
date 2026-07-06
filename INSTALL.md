@@ -90,7 +90,7 @@ Add the following content:
 
 Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`). Reload Mainsail in your browser — OttoBridge now appears as a link near the bottom of the sidebar and opens in a new tab.
 
-> Replace `ottoeject.local` with your Pi's actual hostname or IP address. `localhost` does not work here, since the link is opened by your browser, not by the Pi itself.
+> Replace `ottomk.local` with your Pi's actual hostname or IP address if different. `localhost` does not work here, since the link is opened by your browser, not by the Pi itself.
 
 > If you already have other entries in `navi.json`, add the OttoBridge object to the existing array instead of replacing the file.
 
