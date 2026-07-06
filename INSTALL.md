@@ -81,7 +81,7 @@ Add the following content:
 [
   {
     "title": "OttoBridge",
-    "href": "http://ottoeject.local:8080",
+    "href": "http://ottomk.local:8080",
     "target": "_blank",
     "position": 95
   }
