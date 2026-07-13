@@ -214,7 +214,7 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
         <div class="temp-row"><span class="temp-name" data-i18n="dash.bed">Bed</span><span><span class="temp-val" id="t-bed">—</span><span class="temp-target" id="t-bed-tgt"></span></span></div>
         <div class="btn-row">
           <button class="btn btn-sm" onclick="quickGcodeD('M104 S0\nM140 S0')">❄ <span data-i18n="dash.cool_down">Cool down</span></button>
-          <button class="btn btn-sm" onclick="toast('info',t('toast.sync_requested'))">⟳ <span data-i18n="dash.sync">Sync</span></button>
+          <button class="btn btn-sm" onclick="syncPrinter()">⟳ <span data-i18n="dash.sync">Sync</span></button>
         </div>
       </div>
     </div>
@@ -497,7 +497,7 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
           <div class="field"><label data-i18n="settings.ip_address">IP Address</label><input type="text" id="pf-ip" placeholder="192.168.1.100"></div>
         </div>
         <div>
-          <div class="field" id="pf-code-w"><label><span data-i18n="settings.access_code">Access Code</span> <span style="color:var(--muted)">(Bambu)</span></label><input type="password" id="pf-code" data-i18n-ph="settings.lan_code" placeholder="LAN code"></div>
+          <div class="field" id="pf-code-w"><label><span data-i18n="settings.access_code">Access Code</span> <span style="color:var(--muted)">(Bambu)</span></label><input type="text" id="pf-code" data-i18n-ph="settings.lan_code" placeholder="LAN code"></div>
           <div class="field" id="pf-serial-w"><label><span data-i18n="settings.serial_number">Serial Number</span> <span style="color:var(--muted)">(Bambu)</span></label><input type="text" id="pf-serial" placeholder="01S00A…"></div>
           <div class="field" id="pf-apikey-w"><label><span data-i18n="settings.api_key">API Key</span> <span style="color:var(--muted)">(Prusa)</span></label><input type="password" id="pf-apikey" data-i18n-ph="settings.prusalink_key" placeholder="PrusaLink key"></div>
           <div class="field" id="pf-sc-w"><label><span data-i18n="settings.serial_code">Serial Code</span> <span style="color:var(--muted)">(FlashForge)</span></label><input type="text" id="pf-sc" data-i18n-ph="settings.ff_serial" placeholder="FF serial"></div>
@@ -506,6 +506,7 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
       </div>
       <div class="btn-row">
         <button class="btn btn-acc" onclick="savePrinter()" data-i18n="settings.save_connect">Save &amp; Connect</button>
+        <button class="btn btn-blu" id="pf-test" onclick="testConnection()">⟲ <span data-i18n="settings.test_connection">Test connection</span></button>
         <button class="btn" onclick="closeForm()" data-i18n="settings.cancel">Cancel</button>
         <button class="btn btn-danger" id="pf-del" style="display:none" onclick="delPrinter()" data-i18n="settings.delete">Delete</button>
       </div>
@@ -590,6 +591,10 @@ const I18N = {
     'settings.api_key':'API Key','settings.prusalink_key':'PrusaLink key','settings.serial_code':'Serial Code',
     'settings.ff_serial':'FF serial','settings.check_code':'Check Code','settings.ff_check':'FF check',
     'settings.save_connect':'Save & Connect','settings.cancel':'Cancel','settings.delete':'Delete',
+    'settings.test_connection':'Test connection',
+    'settings.testing_connection':'Testing connection…',
+    'settings.connection_ok':'Connection OK',
+    'settings.connection_failed':'Connection failed',
     'settings.ottoeject_calibration':'OttoEject Calibration',
     'settings.calibration_hint':'Run these commands when setting up OttoEject for the first time or after a configuration change.',
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Move to starting position for OttoEject calibration',
@@ -679,6 +684,10 @@ const I18N = {
     'settings.api_key':'API-Schlüssel','settings.prusalink_key':'PrusaLink-Schlüssel','settings.serial_code':'Seriencode',
     'settings.ff_serial':'FF-Seriennummer','settings.check_code':'Prüfcode','settings.ff_check':'FF-Prüfcode',
     'settings.save_connect':'Speichern & Verbinden','settings.cancel':'Abbrechen','settings.delete':'Löschen',
+    'settings.test_connection':'Verbindung testen',
+    'settings.testing_connection':'Verbindung wird getestet…',
+    'settings.connection_ok':'Verbindung OK',
+    'settings.connection_failed':'Verbindung fehlgeschlagen',
     'settings.ottoeject_calibration':'OttoEject-Kalibrierung',
     'settings.calibration_hint':'Diese Befehle bei der Ersteinrichtung von OttoEject oder nach einer Konfigurationsänderung ausführen.',
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'In Startposition für OttoEject-Kalibrierung fahren',
@@ -768,6 +777,10 @@ const I18N = {
     'settings.api_key':'Clé API','settings.prusalink_key':'Clé PrusaLink','settings.serial_code':'Code de série',
     'settings.ff_serial':'Numéro de série FF','settings.check_code':'Code de vérification','settings.ff_check':'Code de vérification FF',
     'settings.save_connect':'Enregistrer et connecter','settings.cancel':'Annuler','settings.delete':'Supprimer',
+    'settings.test_connection':'Tester la connexion',
+    'settings.testing_connection':'Test de la connexion…',
+    'settings.connection_ok':'Connexion OK',
+    'settings.connection_failed':'Connexion échouée',
     'settings.ottoeject_calibration':'Calibrage OttoEject',
     'settings.calibration_hint':'Exécutez ces commandes lors de la première configuration d\'OttoEject ou après une modification de configuration.',
     'settings.ottoeject_home':'Origine OttoEject','settings.move_to_calib_pos':'Aller à la position de départ pour le calibrage d\'OttoEject',
@@ -857,6 +870,10 @@ const I18N = {
     'settings.api_key':'Chiave API','settings.prusalink_key':'Chiave PrusaLink','settings.serial_code':'Codice seriale',
     'settings.ff_serial':'Numero di serie FF','settings.check_code':'Codice di verifica','settings.ff_check':'Codice di verifica FF',
     'settings.save_connect':'Salva e connetti','settings.cancel':'Annulla','settings.delete':'Elimina',
+    'settings.test_connection':'Testa connessione',
+    'settings.testing_connection':'Test della connessione…',
+    'settings.connection_ok':'Connessione OK',
+    'settings.connection_failed':'Connessione non riuscita',
     'settings.ottoeject_calibration':'Calibrazione OttoEject',
     'settings.calibration_hint':'Esegui questi comandi durante la configurazione iniziale di OttoEject o dopo una modifica della configurazione.',
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Vai alla posizione iniziale per la calibrazione di OttoEject',
@@ -946,6 +963,10 @@ const I18N = {
     'settings.api_key':'Clave API','settings.prusalink_key':'Clave PrusaLink','settings.serial_code':'Código de serie',
     'settings.ff_serial':'Número de serie FF','settings.check_code':'Código de verificación','settings.ff_check':'Código de verificación FF',
     'settings.save_connect':'Guardar y conectar','settings.cancel':'Cancelar','settings.delete':'Eliminar',
+    'settings.test_connection':'Probar conexión',
+    'settings.testing_connection':'Probando conexión…',
+    'settings.connection_ok':'Conexión correcta',
+    'settings.connection_failed':'Conexión fallida',
     'settings.ottoeject_calibration':'Calibración de OttoEject',
     'settings.calibration_hint':'Ejecuta estos comandos al configurar OttoEject por primera vez o tras un cambio de configuración.',
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Ir a la posición inicial para la calibración de OttoEject',
@@ -1249,6 +1270,11 @@ async function ctrl(action){
   const ep=action==='clear_error'?'clear_error':action;
   await api('POST',`/api/print/${ep}`,{printer_id:dashPid});
 }
+async function syncPrinter(){
+  if(!dashPid)return;
+  toast('info',t('toast.sync_requested'));
+  await api('POST','/api/print/sync',{printer_id:dashPid});
+}
 async function quickGcodeD(cmd){if(!dashPid)return;await api('POST','/api/gcode',{printer_id:dashPid,command:cmd});}
 function confirmStop(){if(confirm(t('confirm.cancel_print')))ctrl('stop');}
 
@@ -1290,6 +1316,22 @@ async function savePrinter(){
   if(!body.name||!body.brand||!body.ip){toast('err',t('toast.name_brand_ip_required'));return;}
   const r=await api(pid?'PUT':'POST',pid?`/api/printers/${pid}`:'/api/printers',body);
   if(r){S[r.id]=r;renderAll();closeForm();toast('ok',`${r.name} ${t('toast.saved')} ✓`);if(!dashPid)selectDash(r.id);}
+}
+
+async function testConnection(){
+  const brand=v('pf-brand'), ip=v('pf-ip');
+  if(!brand||!ip){toast('err',t('toast.name_brand_ip_required'));return;}
+  const btn=document.getElementById('pf-test');
+  const original=btn.innerHTML;
+  btn.disabled=true; btn.innerHTML=`⟲ ${t('settings.testing_connection')}`;
+  const body={brand, ip, printer_id:v('pf-id'),
+    access_code:v('pf-code'), serial:v('pf-serial'),
+    api_key:v('pf-apikey'), serial_code:v('pf-sc'), check_code:v('pf-cc')};
+  const r=await api('POST','/api/printers/test',body);
+  btn.disabled=false; btn.innerHTML=original;
+  if(!r)return;
+  if(r.ok) toast('ok',`✓ ${t('settings.connection_ok')} — ${r.message}`);
+  else toast('err',`✕ ${t('settings.connection_failed')} — ${r.message}`);
 }
 
 async function delPrinter(){
