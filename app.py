@@ -717,13 +717,22 @@ def ftp_upload_sync(pid, local_path, remote_name):
     ctx = _bambu_ftp_ctx()
     try:
         with ImplicitFTP_TLS(context=ctx) as ftp:
-            ftp.connect(p.ip, 990, timeout=30); ftp.login("bblp", p.access_code); ftp.prot_p()
+            ftp.set_debuglevel(2)  # TEMP: full FTP wire trace to pin down where it hangs
+            log.error(f"[{p.name}] FTP DEBUG: connecting…")
+            ftp.connect(p.ip, 990, timeout=30)
+            log.error(f"[{p.name}] FTP DEBUG: connected, logging in…")
+            ftp.login("bblp", p.access_code)
+            log.error(f"[{p.name}] FTP DEBUG: logged in, prot_p…")
+            ftp.prot_p()
+            log.error(f"[{p.name}] FTP DEBUG: prot_p done, starting STOR…")
             with open(local_path, "rb") as f: ftp.storbinary(f"STOR {remote_name}", f)
+            log.error(f"[{p.name}] FTP DEBUG: STOR done, sending NOOP…")
             # NOOP confirms the server has fully acknowledged the transfer before
             # we close the TCP session. Without this the X1C firmware may still be
             # writing to its internal storage when the connection drops, causing
             # a 0500-4003 "cannot process file" error on the next project_file command.
             ftp.voidcmd("NOOP")
+            log.error(f"[{p.name}] FTP DEBUG: NOOP done, all good")
         return True
     except Exception as e: log.error(f"[{p.name}] FTP: {e}"); return False
 
