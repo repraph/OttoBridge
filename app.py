@@ -1034,9 +1034,12 @@ def analyze_print_file(filename: str, data: bytes) -> dict:
 
 @app.post("/api/analyze")
 async def analyze_file(file: UploadFile = File(...)):
-    """Upload a .gcode/.3mf/.gcode.3mf and get height + AMS info without
-    transferring it to a printer yet. Used by the Jobs tab for slot
-    calculation and automatic use_ams/ams_mapping detection."""
+    """Upload a .gcode/.3mf/.gcode.3mf, persist it to UPLOAD_DIR, and get
+    height + AMS info. Used by the Jobs tab for slot calculation and
+    automatic use_ams/ams_mapping detection. The file MUST land in
+    UPLOAD_DIR here — the queue automation later reads it from there when
+    the job actually starts (potentially much later), it does not re-upload
+    from the browser."""
     name = file.filename or "upload.gcode"
     if not (name.lower().endswith((".gcode", ".3mf")) or name.lower().endswith(".gcode.3mf")):
         raise HTTPException(400, "Only .gcode, .3mf or .gcode.3mf supported")
@@ -1046,6 +1049,8 @@ async def analyze_file(file: UploadFile = File(...)):
     result = analyze_print_file(name, data)
     if result["height_mm"] is None:
         raise HTTPException(422, f'Could not detect print height in "{name}"')
+    dest = UPLOAD_DIR / name
+    await asyncio.get_event_loop().run_in_executor(None, dest.write_bytes, data)
     return result
 
 @app.get("/api/analyze/{filename}")
