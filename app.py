@@ -722,7 +722,15 @@ def ftp_upload_sync(pid, local_path, remote_name):
         with ImplicitFTP_TLS(context=ctx) as ftp:
             ftp.set_debuglevel(2)  # TEMP: full FTP wire trace to pin down where it hangs
             log.error(f"[{p.name}] FTP DEBUG: connecting…")
-            ftp.connect(p.ip, 990, timeout=30)
+            # 30s wasn't enough: Bambu's embedded FTP server can take a long time
+            # to send the final "226 Transfer complete" confirmation after the
+            # data channel closes (writing to eMMC storage, checksums, parsing
+            # .3mf metadata/thumbnails) — this happens regardless of file size,
+            # and 30s was timing out during that wait, not during the transfer
+            # itself (confirmed via wire-level debug logging: login, PASV, STOR,
+            # data-channel TCP connect and TLS handshake all completed fine —
+            # the hang was strictly after that).
+            ftp.connect(p.ip, 990, timeout=120)
             log.error(f"[{p.name}] FTP DEBUG: connected, logging in…")
             ftp.login("bblp", p.access_code)
             log.error(f"[{p.name}] FTP DEBUG: logged in, prot_p…")
