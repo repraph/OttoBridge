@@ -655,29 +655,31 @@ class ImplicitFTP_TLS(ftplib.FTP_TLS):
     first byte). Stock ftplib.FTP_TLS only supports EXPLICIT FTPS (plaintext
     connect, then an AUTH TLS command on port 21) — calling .connect() on
     port 990 with the plain class makes it wait for a plaintext welcome
-    banner that never arrives (the bytes it gets back are TLS handshake
-    bytes), which is exactly the ~30s timeout we were hitting. This subclass
-    wraps the socket in TLS the moment it's set, before ftplib tries to read
-    anything from it.
+    banner that never arrives, which is exactly the connect-time timeout we
+    hit initially. This subclass wraps the socket in TLS the moment it's
+    set, before ftplib tries to read anything from it.
 
-    Two more Bambu-firmware-specific quirks handled here, both well-documented
-    in the community (e.g. community FTPS clients built specifically for
-    Bambu printers hit the exact same two issues):
-    1. Bambu's embedded FTP server enforces TLS session-ID reuse on the data
-       channel — control and data connections MUST share the same TLS
-       session, or the server accepts the data connection but never replies,
-       which shows up as a plain socket read timeout during the actual file
-       transfer (not at connect/login). ntransfercmd() below explicitly
-       passes session=self.sock.session to fix this — this matches what
-       stock FTP_TLS.ntransfercmd already intends, but we make it explicit
-       and robust here since our custom sock property is involved.
-    2. Bambu's PASV reply sometimes contains a wrong/unreachable IP for the
-       data channel. makepasv() below ignores that and always reconnects to
-       the printer's real IP (the one the control channel is already using).
-    """
-    def __init__(self, *args, **kwargs):
+    This implementation (sock property/setter, ntransfercmd, and critically
+    the storbinary override below) is taken directly from the proven-working
+    `bambulabs_api` package (BambuTools/bambulabs_api, ftp_client.py) after
+    confirming empirically that OUR previous version — which relied on the
+    *inherited* stock ftplib.FTP_TLS.storbinary() — hung indefinitely
+    waiting for the final "226 Transfer complete" reply after a fully
+    successful data transfer (confirmed via wire-level debug logging: login,
+    PASV, STOR, and the data-channel TLS handshake all completed fine; only
+    the post-transfer control-channel read hung). The stock storbinary()
+    closes the data socket via a `with conn:` context manager; overriding it
+    to explicitly `conn.close()` in a `finally` block before calling
+    self.voidresp() is what actually fixes it — Bambu's embedded FTP server
+    apparently doesn't send its final response until the data connection is
+    closed in a way the `with`-based teardown timing doesn't reliably
+    trigger. This is a known, documented Bambu-firmware-specific quirk
+    (several independent Bambu automation projects hit and fixed the exact
+    same thing)."""
+    def __init__(self, *args, unwrap: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
         self._sock = None
+        self.unwrap = unwrap
 
     @property
     def sock(self):
@@ -690,17 +692,27 @@ class ImplicitFTP_TLS(ftplib.FTP_TLS):
         self._sock = value
 
     def ntransfercmd(self, cmd, rest=None):
-        log.error("FTP DEBUG: opening data connection (raw TCP)…")
         conn, size = ftplib.FTP.ntransfercmd(self, cmd, rest)
-        log.error(f"FTP DEBUG: data TCP connected ({conn.getpeername()}), wrapping in TLS…")
         if self._prot_p:
             conn = self.context.wrap_socket(conn, server_hostname=self.host, session=self.sock.session)
-        log.error("FTP DEBUG: data channel TLS wrap done")
         return conn, size
 
-    def makepasv(self):
-        _ignored_host, port = super().makepasv()
-        return self.host, port
+    def storbinary(self, cmd, fp, blocksize=8192, callback=None, rest=None):
+        self.voidcmd("TYPE I")
+        conn = self.transfercmd(cmd, rest)
+        try:
+            while True:
+                buf = fp.read(blocksize)
+                if not buf:
+                    break
+                conn.sendall(buf)
+                if callback:
+                    callback(buf)
+            if isinstance(conn, ssl.SSLSocket) and self.unwrap:
+                conn.unwrap()
+        finally:
+            conn.close()
+        return self.voidresp()
 
 def _bambu_ftp_ctx() -> ssl.SSLContext:
     """SSL context for talking to a Bambu printer's self-signed FTPS cert.
@@ -720,30 +732,15 @@ def ftp_upload_sync(pid, local_path, remote_name):
     ctx = _bambu_ftp_ctx()
     try:
         with ImplicitFTP_TLS(context=ctx) as ftp:
-            ftp.set_debuglevel(2)  # TEMP: full FTP wire trace to pin down where it hangs
-            log.error(f"[{p.name}] FTP DEBUG: connecting…")
-            # 30s wasn't enough: Bambu's embedded FTP server can take a long time
-            # to send the final "226 Transfer complete" confirmation after the
-            # data channel closes (writing to eMMC storage, checksums, parsing
-            # .3mf metadata/thumbnails) — this happens regardless of file size,
-            # and 30s was timing out during that wait, not during the transfer
-            # itself (confirmed via wire-level debug logging: login, PASV, STOR,
-            # data-channel TCP connect and TLS handshake all completed fine —
-            # the hang was strictly after that).
-            ftp.connect(p.ip, 990, timeout=120)
-            log.error(f"[{p.name}] FTP DEBUG: connected, logging in…")
+            ftp.connect(p.ip, 990, timeout=30)
             ftp.login("bblp", p.access_code)
-            log.error(f"[{p.name}] FTP DEBUG: logged in, prot_p…")
             ftp.prot_p()
-            log.error(f"[{p.name}] FTP DEBUG: prot_p done, starting STOR…")
             with open(local_path, "rb") as f: ftp.storbinary(f"STOR {remote_name}", f)
-            log.error(f"[{p.name}] FTP DEBUG: STOR done, sending NOOP…")
             # NOOP confirms the server has fully acknowledged the transfer before
             # we close the TCP session. Without this the X1C firmware may still be
             # writing to its internal storage when the connection drops, causing
             # a 0500-4003 "cannot process file" error on the next project_file command.
             ftp.voidcmd("NOOP")
-            log.error(f"[{p.name}] FTP DEBUG: NOOP done, all good")
         return True
     except Exception as e: log.error(f"[{p.name}] FTP: {e}"); return False
 
