@@ -650,12 +650,35 @@ async def start_printer_task(pid: str):
     else: log.warning(f"Unknown protocol {p.protocol}")
 
 # ── FTP (Bambu) ────────────────────────────────────────────────────────────────
+class ImplicitFTP_TLS(ftplib.FTP_TLS):
+    """Bambu Lab printers speak IMPLICIT FTPS on port 990 (TLS from the very
+    first byte). Stock ftplib.FTP_TLS only supports EXPLICIT FTPS (plaintext
+    connect, then an AUTH TLS command on port 21) — calling .connect() on
+    port 990 with the plain class makes it wait for a plaintext welcome
+    banner that never arrives (the bytes it gets back are TLS handshake
+    bytes), which is exactly the ~30s timeout we were hitting. This subclass
+    wraps the socket in TLS the moment it's set, before ftplib tries to read
+    anything from it."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._sock = None
+
+    @property
+    def sock(self):
+        return self._sock
+
+    @sock.setter
+    def sock(self, value):
+        if value is not None and not isinstance(value, ssl.SSLSocket):
+            value = self.context.wrap_socket(value)
+        self._sock = value
+
 def ftp_upload_sync(pid, local_path, remote_name):
     p = printers.get(pid)
     if not p: return False
     ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
     try:
-        with ftplib.FTP_TLS(context=ctx) as ftp:
+        with ImplicitFTP_TLS(context=ctx) as ftp:
             ftp.connect(p.ip, 990, timeout=30); ftp.login("bblp", p.access_code); ftp.prot_p()
             with open(local_path, "rb") as f: ftp.storbinary(f"STOR {remote_name}", f)
             # NOOP confirms the server has fully acknowledged the transfer before
@@ -913,6 +936,65 @@ async def delete_printer(pid: str):
     if pid in mqtt_tasks and not mqtt_tasks[pid].done(): mqtt_tasks[pid].cancel()
     printers.pop(pid, None); save_config(); return {"ok": True}
 
+class TestConnCfg(BaseModel):
+    """Same shape as PrinterCfg's credential fields, minus name/model — the
+    Test Connection button only needs enough to actually reach the printer."""
+    brand: str; ip: str; printer_id: str = ""
+    access_code: str = ""; serial: str = ""; api_key: str = ""
+    serial_code: str = ""; check_code: str = ""
+
+@app.post("/api/printers/test")
+async def test_printer_connection(cfg: TestConnCfg):
+    """Stateless connectivity check using whatever credentials are currently
+    typed into the Add/Edit Printer form — lets the user verify a LAN code
+    or API key BEFORE saving. If a credential field is left blank (which
+    happens whenever editing an existing printer, since the UI never
+    re-displays stored secrets) and printer_id matches a saved printer, we
+    fall back to the already-stored value instead of testing an empty
+    string — otherwise every edit-without-retyping would falsely "fail"."""
+    stored = printers.get(cfg.printer_id)
+    access_code = cfg.access_code or (stored.access_code if stored else "")
+    api_key     = cfg.api_key     or (stored.api_key     if stored else "")
+    serial_code = cfg.serial_code or (stored.serial_code if stored else "")
+    check_code  = cfg.check_code  or (stored.check_code  if stored else "")
+
+    binfo = BRANDS.get(cfg.brand, {})
+    proto = binfo.get("protocol", "")
+    if not cfg.ip:
+        return {"ok": False, "message": "IP address required"}
+    try:
+        if proto == "mqtt_ftp":
+            ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
+            def _try():
+                with ImplicitFTP_TLS(context=ctx) as ftp:
+                    ftp.connect(cfg.ip, 990, timeout=8); ftp.login("bblp", access_code); ftp.prot_p()
+            await asyncio.get_event_loop().run_in_executor(None, _try)
+            return {"ok": True, "message": "FTP login successful"}
+        elif proto == "prusalink":
+            async with httpx.AsyncClient(timeout=8) as c:
+                r = await c.get(f"http://{cfg.ip}/api/v1/status", headers={"X-Api-Key": api_key})
+            return {"ok": r.status_code == 200, "message": f"HTTP {r.status_code}" if r.status_code != 200 else "PrusaLink reachable"}
+        elif proto == "moonraker":
+            async with httpx.AsyncClient(timeout=8) as c:
+                r = await c.get(f"http://{cfg.ip}:7125/printer/info")
+            return {"ok": r.status_code == 200, "message": f"HTTP {r.status_code}" if r.status_code != 200 else "Moonraker reachable"}
+        elif proto == "websocket":
+            async with httpx.AsyncClient(timeout=8) as c:
+                r = await c.get(f"http://{cfg.ip}/status")
+            return {"ok": r.status_code == 200, "message": f"HTTP {r.status_code}" if r.status_code != 200 else "Reachable"}
+        elif proto == "http_tcp":
+            async with httpx.AsyncClient(timeout=8) as c:
+                r = await c.post(f"http://{cfg.ip}:8898/detail", json={"serialNumber": serial_code, "checkCode": check_code})
+            return {"ok": r.status_code == 200, "message": f"HTTP {r.status_code}" if r.status_code != 200 else "Reachable"}
+        elif proto == "sdcp_ws":
+            async with websockets.connect(f"ws://{cfg.ip}:3030/websocket", open_timeout=8):
+                pass
+            return {"ok": True, "message": "WebSocket connected"}
+        else:
+            return {"ok": False, "message": f"Unknown protocol for brand '{cfg.brand}'"}
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
 # ── Print control ─────────────────────────────────────────────────────────────
 SLOT_GAP_MM = 55  # global_slot_gap (25mm) + 30mm offset, see storage_calibration_variables.cfg
 
@@ -1153,6 +1235,24 @@ async def clear_err(req: PidOnly):
             "subtask_id":p.subtask_id,"print_error":int(p.print_error or 0)}})
         return {"ok": ok}
     return {"ok": False}
+
+@app.post("/api/print/sync")
+async def sync_printer(req: PidOnly):
+    """Force a fresh full status refresh instead of relying on the printer to
+    push one unprompted. Bambu (mqtt_ftp) only sends its full report once at
+    MQTT connect time (pushall) and afterwards only on state changes it
+    decides to announce — if a print genuinely fails and the person clears
+    the error on the printer's own touchscreen, that isn't guaranteed to
+    trigger a fresh push, so our cached gcode_state can go stale (stuck on
+    e.g. FAILED) even though the printer itself is idle again. Re-requesting
+    pushall fixes that immediately. Poll-based protocols already refresh
+    every few seconds on their own, so this is a no-op there."""
+    p = printers.get(req.printer_id)
+    if not p: raise HTTPException(404)
+    if p.protocol == "mqtt_ftp":
+        ok = await bambu_publish(req.printer_id, {"pushing": {"command": "pushall"}})
+        return {"ok": ok}
+    return {"ok": True}
 
 @app.post("/api/gcode")
 async def gcode(req: GcodeReq):
