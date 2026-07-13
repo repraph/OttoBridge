@@ -658,7 +658,23 @@ class ImplicitFTP_TLS(ftplib.FTP_TLS):
     banner that never arrives (the bytes it gets back are TLS handshake
     bytes), which is exactly the ~30s timeout we were hitting. This subclass
     wraps the socket in TLS the moment it's set, before ftplib tries to read
-    anything from it."""
+    anything from it.
+
+    Two more Bambu-firmware-specific quirks handled here, both well-documented
+    in the community (e.g. community FTPS clients built specifically for
+    Bambu printers hit the exact same two issues):
+    1. Bambu's embedded FTP server enforces TLS session-ID reuse on the data
+       channel — control and data connections MUST share the same TLS
+       session, or the server accepts the data connection but never replies,
+       which shows up as a plain socket read timeout during the actual file
+       transfer (not at connect/login). ntransfercmd() below explicitly
+       passes session=self.sock.session to fix this — this matches what
+       stock FTP_TLS.ntransfercmd already intends, but we make it explicit
+       and robust here since our custom sock property is involved.
+    2. Bambu's PASV reply sometimes contains a wrong/unreachable IP for the
+       data channel. makepasv() below ignores that and always reconnects to
+       the printer's real IP (the one the control channel is already using).
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._sock = None
@@ -673,10 +689,32 @@ class ImplicitFTP_TLS(ftplib.FTP_TLS):
             value = self.context.wrap_socket(value)
         self._sock = value
 
+    def ntransfercmd(self, cmd, rest=None):
+        conn, size = ftplib.FTP.ntransfercmd(self, cmd, rest)
+        if self._prot_p:
+            conn = self.context.wrap_socket(conn, server_hostname=self.host, session=self.sock.session)
+        return conn, size
+
+    def makepasv(self):
+        _ignored_host, port = super().makepasv()
+        return self.host, port
+
+def _bambu_ftp_ctx() -> ssl.SSLContext:
+    """SSL context for talking to a Bambu printer's self-signed FTPS cert.
+    OP_IGNORE_UNEXPECTED_EOF works around Python 3.11+'s stricter TLS
+    shutdown handling — some Bambu firmware versions close the TLS
+    connection without a proper close_notify, which newer Python otherwise
+    surfaces as ssl.SSLEOFError."""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
+    if hasattr(ssl, "OP_IGNORE_UNEXPECTED_EOF"):
+        ctx.options |= ssl.OP_IGNORE_UNEXPECTED_EOF
+    return ctx
+
 def ftp_upload_sync(pid, local_path, remote_name):
     p = printers.get(pid)
     if not p: return False
-    ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
+    ctx = _bambu_ftp_ctx()
     try:
         with ImplicitFTP_TLS(context=ctx) as ftp:
             ftp.connect(p.ip, 990, timeout=30); ftp.login("bblp", p.access_code); ftp.prot_p()
@@ -964,7 +1002,7 @@ async def test_printer_connection(cfg: TestConnCfg):
         return {"ok": False, "message": "IP address required"}
     try:
         if proto == "mqtt_ftp":
-            ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
+            ctx = _bambu_ftp_ctx()
             def _try():
                 with ImplicitFTP_TLS(context=ctx) as ftp:
                     ftp.connect(cfg.ip, 990, timeout=8); ftp.login("bblp", access_code); ftp.prot_p()
