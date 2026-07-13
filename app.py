@@ -690,9 +690,12 @@ class ImplicitFTP_TLS(ftplib.FTP_TLS):
         self._sock = value
 
     def ntransfercmd(self, cmd, rest=None):
+        log.error("FTP DEBUG: opening data connection (raw TCP)…")
         conn, size = ftplib.FTP.ntransfercmd(self, cmd, rest)
+        log.error(f"FTP DEBUG: data TCP connected ({conn.getpeername()}), wrapping in TLS…")
         if self._prot_p:
             conn = self.context.wrap_socket(conn, server_hostname=self.host, session=self.sock.session)
+        log.error("FTP DEBUG: data channel TLS wrap done")
         return conn, size
 
     def makepasv(self):
