@@ -768,28 +768,6 @@ async def system_stats_loop():
             await broadcast("system_stats", {"connected": False})
         await asyncio.sleep(2)
 
-@app.get("/api/system/stats")
-async def get_system_stats():
-    """One-shot fetch for initial page load, before the websocket delivers the
-    first periodic update from system_stats_loop()."""
-    try:
-        async with httpx.AsyncClient(timeout=5) as c:
-            r = await c.get(f"{MOONRAKER_URL}/machine/proc_stats")
-            res = r.json().get("result", {})
-        mem = res.get("system_memory", {})
-        mem_total = mem.get("total"); mem_used = (mem_total or 0) - mem.get("available", 0)
-        disk_total, disk_used = await _fetch_disk_usage()
-        return {
-            "cpu_pct": res.get("system_cpu_usage", {}).get("cpu"),
-            "mem_pct": round(mem_used / mem_total * 100, 1) if mem_total else None,
-            "disk_pct": round(disk_used / disk_total * 100, 1) if disk_total else None,
-            "temp_c": res.get("cpu_temp"),
-            "uptime_s": res.get("system_uptime"),
-            "connected": True,
-        }
-    except Exception as e:
-        return {"connected": False, "error": str(e)}
-
 # ── Lifespan ───────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -840,6 +818,28 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="OttoBridge v2", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
+@app.get("/api/system/stats")
+async def get_system_stats():
+    """One-shot fetch for initial page load, before the websocket delivers the
+    first periodic update from system_stats_loop()."""
+    try:
+        async with httpx.AsyncClient(timeout=5) as c:
+            r = await c.get(f"{MOONRAKER_URL}/machine/proc_stats")
+            res = r.json().get("result", {})
+        mem = res.get("system_memory", {})
+        mem_total = mem.get("total"); mem_used = (mem_total or 0) - mem.get("available", 0)
+        disk_total, disk_used = await _fetch_disk_usage()
+        return {
+            "cpu_pct": res.get("system_cpu_usage", {}).get("cpu"),
+            "mem_pct": round(mem_used / mem_total * 100, 1) if mem_total else None,
+            "disk_pct": round(disk_used / disk_total * 100, 1) if disk_total else None,
+            "temp_c": res.get("cpu_temp"),
+            "uptime_s": res.get("system_uptime"),
+            "connected": True,
+        }
+    except Exception as e:
+        return {"connected": False, "error": str(e)}
 
 # ── Pydantic models ────────────────────────────────────────────────────────────
 class PrinterCfg(BaseModel):
