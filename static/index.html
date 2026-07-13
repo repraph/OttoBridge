@@ -128,7 +128,13 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
 .step-num.abort{background:#1f0f0f;color:var(--red)}
 .queue-counters{display:flex;gap:14px;margin-bottom:12px;font-size:10px;color:var(--muted)}
 .queue-counters b{font-size:14px;color:var(--txt);margin-right:4px}
-@media(max-width:640px){.g2,.g4{grid-template-columns:1fr 1fr}.eject-grid{grid-template-columns:1fr}}
+.sys-footer{position:sticky;bottom:0;z-index:100;display:flex;align-items:center;gap:18px;padding:7px 24px;background:rgba(10,10,11,.96);backdrop-filter:blur(8px);border-top:1px solid var(--brd);font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0}
+.sys-footer b{color:var(--txt);font-weight:600}
+.sys-footer .sf-warn{color:var(--yel)}
+.sys-footer .sf-hot{color:var(--red)}
+.sys-footer .sf-sep{width:1px;height:12px;background:var(--brd2)}
+.sys-footer .sf-fill{flex:1}
+@media(max-width:640px){.g2,.g4{grid-template-columns:1fr 1fr}.eject-grid{grid-template-columns:1fr}.sys-footer{font-size:10px;gap:10px;padding:6px 12px;flex-wrap:wrap}}
 @media(max-width:400px){.g2{grid-template-columns:1fr}}
 </style>
 </head>
@@ -545,6 +551,19 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
 </div>
 
 </main>
+<footer class="sys-footer" id="sys-footer">
+  <span><b id="sf-cpu">—</b>% CPU</span>
+  <span class="sf-sep"></span>
+  <span><b id="sf-temp">—</b>°C</span>
+  <span class="sf-sep"></span>
+  <span><b id="sf-ram">—</b>% RAM</span>
+  <span class="sf-sep"></span>
+  <span><b id="sf-disk">—</b>% Disk</span>
+  <span class="sf-fill"></span>
+  <span>↓<b id="sf-rx">—</b> KB/s</span>
+  <span>↑<b id="sf-tx">—</b> KB/s</span>
+  <div class="dot" id="sf-dot" style="width:6px;height:6px"></div>
+</footer>
 </div>
 <div id="toast-container"></div>
 
@@ -1061,6 +1080,7 @@ let jobsState=[];
   renderAll();renderRack();renderJobs();renderQueueUI();
   if(!dashPid&&init.length)selectDash(init[0].id);
   connectWS();
+  api('GET','/api/system/stats').then(renderSysFooter);
 })();
 
 function connectWS(){
@@ -1085,10 +1105,35 @@ function connectWS(){
         queueState=msg.data;renderQueueUI();
       }else if(msg.event==='job_added'||msg.event==='job_done'){
         loadJobs();
+      }else if(msg.event==='system_stats'){
+        renderSysFooter(msg.data);
       }
     }catch{}
   };
   ws.onclose=()=>{setDot(false,'Disconnected');wsT=setTimeout(connectWS,3000);};
+}
+
+function renderSysFooter(d){
+  const dot=document.getElementById('sf-dot');
+  if(!dot)return;
+  if(!d||d.connected===false){
+    dot.className='dot offline';
+    ['sf-cpu','sf-temp','sf-ram','sf-disk','sf-rx','sf-tx'].forEach(id=>setText(id,'—'));
+    return;
+  }
+  dot.className='dot online';
+  setText('sf-cpu',d.cpu_pct!=null?Math.round(d.cpu_pct):'—');
+  setText('sf-ram',d.mem_pct!=null?Math.round(d.mem_pct):'—');
+  setText('sf-disk',d.disk_pct!=null?Math.round(d.disk_pct):'—');
+  setText('sf-rx',d.rx_kbps!=null?d.rx_kbps.toFixed(1):'—');
+  setText('sf-tx',d.tx_kbps!=null?d.tx_kbps.toFixed(1):'—');
+  const tEl=document.getElementById('sf-temp');
+  if(tEl){
+    if(d.temp_c!=null){
+      tEl.textContent=d.temp_c.toFixed(0);
+      tEl.className=d.temp_c>=75?'sf-hot':d.temp_c>=60?'sf-warn':'';
+    }else tEl.textContent='—';
+  }
 }
 
 function populateBrandSelects(){
