@@ -14,6 +14,7 @@ from typing import Optional
 import aiomqtt
 import aiofiles, aiofiles.os
 import httpx
+import websockets
 from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -59,14 +60,21 @@ BRANDS = {
     },
     "anycubic": {
         "label": "Anycubic",
+        # NOTE: requires the Rinkhals custom firmware overlay (jbatonnet/Rinkhals).
+        # Rinkhals installs a real Moonraker instance on top of stock Anycubic
+        # firmware (non-destructive), which is what this protocol talks to.
+        # Native/stock Anycubic firmware has NO usable local API for this.
         "protocol": "moonraker",
         "models": ["Kobra S1"],
         "auth_fields": ["ip"],
         "start_grace_s": 720,
+        "requires_custom_firmware": "Rinkhals (jbatonnet/Rinkhals)",
     },
     "elegoo": {
         "label": "Elegoo",
-        "protocol": "websocket_elegoo",
+        # Native stock firmware — talks SDCP v3 directly over WebSocket (port 3030).
+        # No custom firmware needed, no auth handshake required by the printer.
+        "protocol": "sdcp_ws",
         "models": ["Centauri Carbon", "Centauri"],
         "auth_fields": ["ip"],
         "start_grace_s": 480,
@@ -173,7 +181,7 @@ class PrinterState:
         self.bed_temp = None; self.bed_target = None; self.progress = None
         self.remaining_min = None; self.filename = ""; self.layer_num = None
         self.total_layer_num = None; self.ams = {}; self.print_error = "0"
-        self.subtask_id = "0"; self._mqtt = None
+        self.subtask_id = "0"; self._mqtt = None; self._ws = None
 
     @property
     def protocol(self): return BRANDS.get(self.brand, {}).get("protocol", "unknown")
@@ -517,6 +525,111 @@ async def flashforge_poll_loop(pid: str):
             if p.connected: p.connected = False; await broadcast("state", p.to_dict())
         await asyncio.sleep(4)
 
+def _sdcp_msg(cmd: int, data: dict, mainboard_id: str = "") -> str:
+    """Build an SDCP request envelope per cbd-tech spec (Cmd/RequestID/MainboardID/TimeStamp/From)."""
+    return json.dumps({
+        "Id": uuid.uuid4().hex, "Data": {
+            "Cmd": cmd, "Data": data, "RequestID": uuid.uuid4().hex,
+            "MainboardID": mainboard_id, "TimeStamp": int(time.time()), "From": 0,
+        },
+    })
+
+async def elegoo_sdcp_loop(pid: str):
+    """Native Elegoo Centauri Carbon — SDCP v3 over WebSocket, port 3030.
+    No auth/handshake required. Official protocol spec:
+    github.com/cbd-tech/SDCP-Smart-Device-Control-Protocol-V3.0.0
+    FDM-specific PrintInfo.Status codes cross-checked against a real Centauri
+    Carbon capture: github.com/WalkerFrederick/sdcp-centauri-carbon (the official
+    spec's enum is written for CBD's resin printers — HOMING/DROPPING/EXPOSURING/
+    LIFTING don't apply to an FDM machine, so we use the FDM-observed codes below).
+    Keeps the websocket on p._ws so control commands (start/pause/stop) can reuse
+    the same connection via elegoo_sdcp_send() instead of reconnecting each time.
+    """
+    p = printers.get(pid)
+    if not p: return
+    uri = f"ws://{p.ip}:3030/websocket"
+    log.info(f"[{p.name}] SDCP → {uri}")
+    _SM = {0: "IDLE", 5: "PAUSING", 8: "PREPARE", 9: "RUNNING",
+           10: "PAUSED", 13: "RUNNING", 20: "RESUMING"}
+    while printers.get(pid):
+        try:
+            async with websockets.connect(uri, open_timeout=10, ping_interval=20, ping_timeout=20) as ws:
+                p.connected = True; p.last_seen = time.time(); p._ws = ws
+                await broadcast("state", p.to_dict())
+                await ws.send(_sdcp_msg(0, {}))  # Cmd 0: request status refresh
+                async for raw in ws:
+                    if not printers.get(pid): break
+                    try:
+                        msg = json.loads(raw)
+                        status = msg.get("Status")
+                        if not status:
+                            continue  # response/attributes/error/notice frames — ignore here
+                        pi = status.get("PrintInfo", {})
+                        p.status          = _SM.get(pi.get("Status"), "UNKNOWN")
+                        p.nozzle_temp     = _flt(status.get("TempOfNozzle"))
+                        p.nozzle_target   = _flt(status.get("TempTargetNozzle"))
+                        p.bed_temp        = _flt(status.get("TempOfHotbed"))
+                        p.bed_target      = _flt(status.get("TempTargetHotbed"))
+                        p.layer_num       = pi.get("CurrentLayer")
+                        p.total_layer_num = pi.get("TotalLayer")
+                        if pi.get("TotalTicks"):
+                            p.progress = round(pi.get("CurrentTicks", 0) / pi["TotalTicks"] * 100, 1)
+                        p.filename        = pi.get("Filename", p.filename)
+                        p.print_error     = str(pi.get("ErrorNumber", "0"))
+                        p.last_seen       = time.time()
+                        await broadcast("state", p.to_dict())
+                    except Exception as e:
+                        log.debug(f"[{p.name}] sdcp parse: {e}")
+        except Exception as e:
+            log.debug(f"[{p.name}] sdcp: {e}")
+        finally:
+            if printers.get(pid):
+                printers[pid].connected = False; printers[pid]._ws = None
+                await broadcast("state", p.to_dict())
+        await asyncio.sleep(5)
+
+async def elegoo_sdcp_send(pid: str, cmd: int, data: dict) -> bool:
+    """Send an SDCP control command (128 start / 129 pause / 130 stop / 131 resume)
+    over the persistent connection kept open by elegoo_sdcp_loop."""
+    p = printers.get(pid)
+    if not p or not p._ws: return False
+    try:
+        await p._ws.send(_sdcp_msg(cmd, data)); return True
+    except Exception as e:
+        log.error(f"[{p.name}] sdcp send: {e}"); return False
+
+async def elegoo_sdcp_upload(pid: str, local_path: str, remote_name: str) -> bool:
+    """Native Elegoo file upload — dedicated HTTP endpoint on port 3030, NOT the
+    websocket. Sent as 1MB multipart/form-data chunks per the official spec:
+    POST http://<ip>:3030/uploadFile/upload
+      S-File-MD5, Check, Offset, Uuid (same for every chunk), TotalSize, File
+    """
+    import hashlib
+    p = printers.get(pid)
+    if not p: return False
+    path = Path(local_path)
+    data = path.read_bytes()
+    md5 = hashlib.md5(data).hexdigest()
+    file_uuid = uuid.uuid4().hex
+    total = len(data)
+    chunk_size = 1024 * 1024
+    try:
+        async with httpx.AsyncClient(timeout=30) as c:
+            for offset in range(0, total, chunk_size):
+                chunk = data[offset:offset + chunk_size]
+                r = await c.post(
+                    f"http://{p.ip}:3030/uploadFile/upload",
+                    data={"S-File-MD5": md5, "Check": "1", "Offset": str(offset),
+                          "Uuid": file_uuid, "TotalSize": str(total)},
+                    files={"File": (remote_name, chunk, "application/octet-stream")},
+                )
+                if r.status_code != 200 or not r.json().get("success", False):
+                    log.error(f"[{p.name}] sdcp upload chunk @{offset}: {r.text[:200]}")
+                    return False
+        return True
+    except Exception as e:
+        log.error(f"[{p.name}] sdcp upload: {e}"); return False
+
 async def start_printer_task(pid: str):
     if pid in mqtt_tasks and not mqtt_tasks[pid].done():
         mqtt_tasks[pid].cancel()
@@ -528,9 +641,9 @@ async def start_printer_task(pid: str):
         "mqtt_ftp":        bambu_mqtt_loop,
         "prusalink":       prusa_poll_loop,
         "websocket":       creality_poll_loop,
-        "websocket_elegoo":moonraker_poll_loop,
+        "sdcp_ws":         elegoo_sdcp_loop,
         "http_tcp":        flashforge_poll_loop,
-        "moonraker":       moonraker_poll_loop,
+        "moonraker":       moonraker_poll_loop,   # Anycubic KS1 requires Rinkhals installed
     }
     fn = loop_map.get(p.protocol)
     if fn: mqtt_tasks[pid] = asyncio.create_task(fn(pid))
@@ -592,6 +705,91 @@ async def moonraker_gcode(pid, script):
         return r.status_code == 200
     except Exception as e: log.error(f"gcode: {e}"); return False
 
+# ── System stats (footer) ───────────────────────────────────────────────────
+# Pulls host metrics from the Moonraker instance running alongside the
+# OTTOeject's Klipper board — exactly the same data source Mainsail's own
+# "System" panel uses, so no extra agent/psutil setup needed on the Pi.
+_last_net = {}          # {iface: (bytes, ts)} for throughput deltas
+_disk_cache = {"total": None, "used": None, "ts": 0}
+
+async def _fetch_disk_usage():
+    """Moonraker exposes filesystem usage on /server/files/directory. Cached
+    and refreshed only every 30s — it's slow-changing and no need to hammer it
+    on every 2s tick."""
+    if time.time() - _disk_cache["ts"] < 30:
+        return _disk_cache["total"], _disk_cache["used"]
+    try:
+        async with httpx.AsyncClient(timeout=5) as c:
+            r = await c.get(f"{MOONRAKER_URL}/server/files/directory", params={"path": "gcodes"})
+            du = r.json().get("result", {}).get("disk_usage", {})
+            _disk_cache.update(total=du.get("total"), used=du.get("used"), ts=time.time())
+    except Exception as e:
+        log.debug(f"disk_usage: {e}")
+    return _disk_cache["total"], _disk_cache["used"]
+
+async def system_stats_loop():
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=5) as c:
+                r = await c.get(f"{MOONRAKER_URL}/machine/proc_stats")
+                res = r.json().get("result", {})
+            cpu = res.get("system_cpu_usage", {}).get("cpu")
+            mem = res.get("system_memory", {})
+            mem_total = mem.get("total"); mem_used = (mem_total or 0) - mem.get("available", 0)
+            temp = res.get("cpu_temp")
+            uptime_s = res.get("system_uptime")
+
+            now = time.time(); rx_rate = tx_rate = 0.0
+            for iface, n in (res.get("network") or {}).items():
+                rx, tx = n.get("rx_bytes", 0), n.get("tx_bytes", 0)
+                prev = _last_net.get(iface)
+                if prev:
+                    dt = now - prev[2]
+                    if dt > 0:
+                        rx_rate += max(0, rx - prev[0]) / dt
+                        tx_rate += max(0, tx - prev[1]) / dt
+                _last_net[iface] = (rx, tx, now)
+
+            disk_total, disk_used = await _fetch_disk_usage()
+
+            await broadcast("system_stats", {
+                "cpu_pct":     round(cpu, 1) if cpu is not None else None,
+                "mem_pct":     round(mem_used / mem_total * 100, 1) if mem_total else None,
+                "mem_used_mb": round(mem_used / 1024, 0) if mem_used else None,
+                "disk_pct":    round(disk_used / disk_total * 100, 1) if disk_total else None,
+                "temp_c":      round(temp, 1) if temp is not None else None,
+                "uptime_s":    uptime_s,
+                "rx_kbps":     round(rx_rate / 1024, 1),
+                "tx_kbps":     round(tx_rate / 1024, 1),
+                "connected":   True,
+            })
+        except Exception as e:
+            log.debug(f"system_stats: {e}")
+            await broadcast("system_stats", {"connected": False})
+        await asyncio.sleep(2)
+
+@app.get("/api/system/stats")
+async def get_system_stats():
+    """One-shot fetch for initial page load, before the websocket delivers the
+    first periodic update from system_stats_loop()."""
+    try:
+        async with httpx.AsyncClient(timeout=5) as c:
+            r = await c.get(f"{MOONRAKER_URL}/machine/proc_stats")
+            res = r.json().get("result", {})
+        mem = res.get("system_memory", {})
+        mem_total = mem.get("total"); mem_used = (mem_total or 0) - mem.get("available", 0)
+        disk_total, disk_used = await _fetch_disk_usage()
+        return {
+            "cpu_pct": res.get("system_cpu_usage", {}).get("cpu"),
+            "mem_pct": round(mem_used / mem_total * 100, 1) if mem_total else None,
+            "disk_pct": round(disk_used / disk_total * 100, 1) if disk_total else None,
+            "temp_c": res.get("cpu_temp"),
+            "uptime_s": res.get("system_uptime"),
+            "connected": True,
+        }
+    except Exception as e:
+        return {"connected": False, "error": str(e)}
+
 # ── Lifespan ───────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -604,6 +802,7 @@ async def lifespan(app: FastAPI):
         p.api_key = pr.get("api_key",""); p.serial_code = pr.get("serial_code",""); p.check_code = pr.get("check_code","")
         printers[pid] = p
         if p.ip: asyncio.create_task(start_printer_task(pid))
+    asyncio.create_task(system_stats_loop())
     rc = cfg.get("rack", {})
     if rc.get("num_slots"): rack.resize(rc["num_slots"])
     for i, s in enumerate(rc.get("slots", [])):
@@ -890,13 +1089,18 @@ async def start_print(req: StartPrint):
                     headers={"X-Api-Key":p.api_key}, json={"path":f"/usb/{req.filename}"})
             ok = r.status_code in (200,201,204)
         except Exception as e: raise HTTPException(503, str(e))
-    elif p.protocol in ("moonraker","websocket","websocket_elegoo"):
-        # Anycubic (ACE Pro), Elegoo (CANVAS), Creality (CFS):
+    elif p.protocol in ("moonraker","websocket"):
+        # Anycubic (ACE Pro, via Rinkhals+Moonraker), Creality (CFS):
         # Multi-material tool changes (T0, T1, ACE_CHANGE_TOOL etc.) are embedded
         # in the gcode by the slicer. Klipper/Moonraker handles them automatically
         # via the respective Klipper modules (ACEPRO driver, etc.).
         # OttoBridge only needs to start the file — no extra parameters needed.
         ok = await moonraker_gcode(req.printer_id, f"SDCARD_PRINT_FILE FILENAME={req.filename}")
+    elif p.protocol == "sdcp_ws":
+        # Elegoo native SDCP: Cmd 128 starts the file already sitting on the printer
+        # (uploaded beforehand via elegoo_sdcp_upload). CANVAS multi-material tool
+        # changes are embedded in the gcode itself — no extra params needed here.
+        ok = await elegoo_sdcp_send(req.printer_id, 128, {"Filename": req.filename, "StartLayer": 0})
     elif p.protocol == "http_tcp":
         # FlashForge: no multi-material system supported
         try:
@@ -920,9 +1124,12 @@ async def _ctrl(pid, cmd):
             r = await c.put(f"http://{p.ip}/api/v1/job",
                 headers={"X-Api-Key":p.api_key}, json={"command":cm})
         return r.status_code in (200,204)
-    elif p.protocol in ("moonraker","websocket","websocket_elegoo"):
+    elif p.protocol in ("moonraker","websocket"):
         gc = {"pause":"PAUSE","resume":"RESUME","stop":"CANCEL_PRINT"}.get(cmd, cmd.upper())
         return await moonraker_gcode(pid, gc)
+    elif p.protocol == "sdcp_ws":
+        sdcp_cmd = {"pause":129,"stop":130,"resume":131}.get(cmd)
+        return await elegoo_sdcp_send(pid, sdcp_cmd, {}) if sdcp_cmd else False
     return False
 
 @app.post("/api/print/pause")
@@ -968,8 +1175,10 @@ async def upload(pid: str, file: UploadFile = File(...)):
         ok = await loop.run_in_executor(None, ftp_upload_sync, pid, str(dest), file.filename)
     elif p.protocol == "prusalink":
         ok = await prusa_upload(pid, str(dest), file.filename)
-    elif p.protocol in ("moonraker","websocket","websocket_elegoo"):
+    elif p.protocol in ("moonraker","websocket"):
         ok = await moonraker_upload(pid, str(dest), file.filename)
+    elif p.protocol == "sdcp_ws":
+        ok = await elegoo_sdcp_upload(pid, str(dest), file.filename)
     else: ok = True
     if not ok: raise HTTPException(502, "Upload to printer failed")
     return {"ok": True, "filename": file.filename}
@@ -1310,8 +1519,10 @@ class QueueManager:
             ok = await loop.run_in_executor(None, ftp_upload_sync, p.id, str(local), fname)
         elif p.protocol == "prusalink":
             ok = await prusa_upload(p.id, str(local), fname)
-        elif p.protocol in ("moonraker", "websocket", "websocket_elegoo"):
+        elif p.protocol in ("moonraker", "websocket"):
             ok = await moonraker_upload(p.id, str(local), fname)
+        elif p.protocol == "sdcp_ws":
+            ok = await elegoo_sdcp_upload(p.id, str(local), fname)
         elif p.protocol == "http_tcp":
             try:
                 async with httpx.AsyncClient(timeout=60) as c:
