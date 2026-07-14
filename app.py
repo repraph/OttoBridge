@@ -1221,9 +1221,15 @@ async def start_print(req: StartPrint):
         # Multi-material (AMS/AMS Lite): use_ams=True + correct ams_mapping
         # Single-material (external spool): use_ams=False, ams_mapping=[254,254,254,254]
         ams_mapping = _normalize_ams_mapping(req.ams_map, req.use_ams)
+        # For .3mf project files, Bambu firmware needs "param" to point at the
+        # specific plate's gcode inside the archive (Printloom's independent
+        # implementation documents this explicitly and always sets it for
+        # .3mf; we previously always sent "" here). Raw .gcode files have no
+        # such internal structure, so param stays empty for those.
+        param = "Metadata/plate_1.gcode" if req.filename.lower().endswith(".3mf") else ""
         ok = await bambu_publish(req.printer_id, {"print": {
             "command":"project_file","sequence_id":_seq(),
-            "file":req.filename,"url":f"ftp:///{req.filename}","param":"",
+            "file":req.filename,"url":f"ftp:///{req.filename}","param":param,
             "bed_type":req.bed_type,"bed_leveling":req.bed_level,
             "flow_cali":req.flow_cali,"vibration_cali":req.vibr_cali,
             "layer_inspect":req.layer_inspect,"use_ams":req.use_ams,
@@ -1294,10 +1300,17 @@ async def clear_err(req: PidOnly):
     p = printers.get(req.printer_id)
     if not p: raise HTTPException(404)
     if p.protocol == "mqtt_ftp":
-        ok = await bambu_publish(req.printer_id, {"print":{
+        ok1 = await bambu_publish(req.printer_id, {"print":{
             "command":"clean_print_error","sequence_id":_seq(),
             "subtask_id":p.subtask_id,"print_error":int(p.print_error or 0)}})
-        return {"ok": ok}
+        # clean_print_error alone often doesn't actually flip gcode_state back to
+        # IDLE (confirmed: our own "Clear error" button had no visible effect).
+        # An independent Bambu integration (Printloom) resets a stuck FAILED
+        # state by sending "stop" instead — do both for the best chance of
+        # actually clearing it.
+        ok2 = await bambu_publish(req.printer_id, {"print":{
+            "command":"stop","sequence_id":_seq()}})
+        return {"ok": ok1 or ok2}
     return {"ok": False}
 
 @app.post("/api/print/sync")
