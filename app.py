@@ -422,6 +422,15 @@ async def bambu_mqtt_loop(pid: str):
                     p.print_error     = str(pr.get("print_error", "0"))
                     p.subtask_id      = str(pr.get("subtask_id", "0"))
                     p.ams             = pr.get("ams", {})
+                    if p.status == "IDLE":
+                        # p.raw is a cumulative merge of every partial MQTT update
+                        # we've ever received (_merge never deletes stale keys),
+                        # and Bambu doesn't reliably re-send layer_num/progress/etc.
+                        # as 0 once a print ends — so without this, the dashboard
+                        # keeps showing the previous print's layer count and
+                        # progress indefinitely even though nothing is printing.
+                        p.layer_num = p.total_layer_num = p.progress = p.remaining_min = None
+                        p.filename = ""
                     await broadcast("state", p.to_dict())
                 except Exception as e: log.debug(f"[{p.name}] parse: {e}")
     except Exception as e: log.error(f"[{p.name}] MQTT: {e}")
@@ -1633,6 +1642,11 @@ class QueueManager:
                 if p and p.protocol == "mqtt_ftp":
                     await asyncio.sleep(5)
                 await start_print(req)
+                # Nudge Bambu for a fresh status ASAP so _wait_for_finish's
+                # seen_active guard clears the stale-status window quickly
+                # instead of waiting for the next unprompted push.
+                if p and p.protocol == "mqtt_ftp":
+                    await bambu_publish(pid, {"pushing": {"command": "pushall"}})
                 return True
             if step == "wait_finish":
                 return await self._wait_for_finish(pid)
@@ -1751,15 +1765,33 @@ class QueueManager:
         """Poll printer status until FINISH (success) or FAILED/CANCELLED (error).
         For Bambu printers, also watches print_error — the X1C sets a non-zero
         error code (e.g. 0500-4003) before gcode_state flips to FAILED, so we
-        catch it early to avoid the queue hanging on a stalled RUNNING status."""
+        catch it early to avoid the queue hanging on a stalled RUNNING status.
+
+        We only start honoring FAILED/CANCELLED/STOPPED as a real failure once
+        we've either (a) seen the printer actually go active (RUNNING/PREPARE)
+        at least once, or (b) a 60s grace period has passed. (a) exists
+        because right after start_print() there's a window where p.status can
+        still hold a STALE value left over from a previous print attempt —
+        MQTT pushes aren't instant — and without this guard that gets
+        misread as this print having already failed. (b) exists so a print
+        that genuinely fails immediately and never reaches RUNNING/PREPARE at
+        all doesn't hang the queue forever waiting for a state that's never
+        coming — 60s is generous enough for any push delay while still
+        catching a real fast failure promptly."""
+        seen_active = False
+        grace_deadline = time.time() + 60
         while True:
             if self.state != "running": return False
             p = printers.get(pid)
             if not p: return False
+            if p.status in ("RUNNING", "PREPARE"): seen_active = True
             if p.status == "FINISH": return True
-            if p.status in ("FAILED", "CANCELLED", "STOPPED"): return False
+            trust_terminal_status = seen_active or time.time() > grace_deadline
+            if trust_terminal_status and p.status in ("FAILED", "CANCELLED", "STOPPED"):
+                log.error(f"[{p.name}] status={p.status} while waiting for finish — treating as failed")
+                return False
             # Bambu-specific: catch print errors before status flips
-            if p.protocol == "mqtt_ftp" and p.print_error not in ("0", "", "0x0", None):
+            if trust_terminal_status and p.protocol == "mqtt_ftp" and p.print_error not in ("0", "", "0x0", None):
                 log.error(f"[{p.name}] print_error={p.print_error} detected — treating as FAILED")
                 return False
             await asyncio.sleep(3)
