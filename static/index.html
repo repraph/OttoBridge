@@ -520,24 +520,14 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
     </div>
     <div class="btn-row">
       <button class="btn btn-sm" onclick="qg('OTTOEJECT_HOME')" title="G28 Y → G28 X → G28 Z → G1 Y10 X10 Z10" data-i18n="settings.ottoeject_home">OttoEject Home</button>
-      <button class="btn btn-sm" id="calib-z-btn" onclick="sendCalibMove()" data-i18n-title="settings.move_to_calib_pos" title="Move to starting position for OttoEject calibration">Z → 200mm</button>
       <button class="btn btn-sm" onclick="qg('PARK_OTTOEJECT')" data-i18n="console.park_ottoeject">Park OttoEject</button>
+      <button class="btn btn-sm" id="calib-z-btn" onclick="sendCalibMove()" data-i18n-title="settings.move_to_calib_pos" title="Move to starting position for OttoEject calibration">Drucker Z → 200mm</button>
+      <button class="btn btn-sm" id="calib-pick-btn" onclick="sendCalibPick()" data-i18n="eject.eject_from_printer">Eject from printer</button>
+      <button class="btn btn-sm" id="calib-store-btn" onclick="sendCalibStore()" data-i18n="eject.load_onto_printer">Load onto printer</button>
     </div>
     <div style="font-size:10px;color:var(--muted);margin-top:8px;font-family:var(--mono);line-height:1.8">
       OTTOEJECT_HOME: G28 Y → G28 X → G28 Z → G1 Y10 X10 Z10<br>
       <span id="calib-cmd-hint">Z → 200mm: G1 Z200 F3000 (CoreXY)</span>
-    </div>
-  </div>
-  <hr class="divider">
-  <div class="sec-title" data-i18n="settings.mainsail_sidebar">Mainsail Sidebar</div>
-  <div class="card">
-    <div style="font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px">
-      <span data-i18n="settings.mainsail_hint_1">Add OttoBridge as a link in Mainsail's sidebar via</span> <code style="background:var(--brd2);padding:1px 5px;border-radius:2px">.theme/navi.json</code>:
-    </div>
-    <div style="background:var(--bg);border:1px solid var(--brd2);border-radius:2px;padding:12px;font-family:var(--mono);font-size:11px;color:#808090;line-height:1.8" id="mainsail-snippet"></div>
-    <div class="btn-row"><button class="btn btn-sm" onclick="copySnippet()" data-i18n="settings.copy">Copy</button></div>
-    <div style="font-size:10px;color:var(--muted);margin-top:10px;line-height:1.7">
-      <span data-i18n="settings.mainsail_hint_2">Save this as</span> <code style="background:var(--brd2);padding:1px 4px;border-radius:2px">~/printer_data/config/.theme/navi.json</code> <span data-i18n="settings.mainsail_hint_3">on the Pi, then reload Mainsail. See INSTALL.md for details.</span>
     </div>
   </div>
   <hr class="divider">
@@ -553,17 +543,20 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
 
 </main>
 <footer class="sys-footer" id="sys-footer">
+  <span style="display:flex;align-items:center;gap:5px"><div class="dot" id="sf-printer-dot" style="width:6px;height:6px"></div><span id="sf-printer-name">—</span></span>
+  <span class="sf-sep"></span>
+  <span style="display:flex;align-items:center;gap:5px"><div class="dot" id="sf-eject-dot" style="width:6px;height:6px"></div>OTTOeject</span>
+  <span class="sf-sep"></span>
   <span><b id="sf-cpu">—</b>% CPU</span>
   <span class="sf-sep"></span>
-  <span><b id="sf-temp">—</b>°C</span>
-  <span class="sf-sep"></span>
   <span><b id="sf-ram">—</b>% RAM</span>
+  <span class="sf-sep"></span>
+  <span><b id="sf-temp">—</b>°C</span>
   <span class="sf-sep"></span>
   <span><b id="sf-disk">—</b>% Disk</span>
   <span class="sf-fill"></span>
   <span>↓<b id="sf-rx">—</b> KB/s</span>
   <span>↑<b id="sf-tx">—</b> KB/s</span>
-  <div class="dot" id="sf-dot" style="width:6px;height:6px"></div>
 </footer>
 </div>
 <div id="toast-container"></div>
@@ -598,10 +591,7 @@ const I18N = {
     'settings.ottoeject_calibration':'OttoEject Calibration',
     'settings.calibration_hint':'Run these commands when setting up OttoEject for the first time or after a configuration change.',
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Move to starting position for OttoEject calibration',
-    'settings.mainsail_sidebar':'Mainsail Sidebar',
-    'settings.mainsail_hint_1':'Add OttoBridge as a link in Mainsail\'s sidebar via',
-    'settings.mainsail_hint_2':'Save this as','settings.mainsail_hint_3':'on the Pi, then reload Mainsail. See INSTALL.md for details.',
-    'settings.copy':'Copy','settings.pi_resources':'Pi Zero 2 W — Resources','settings.reserve':'Reserve','settings.cpu_load_idle':'CPU load (idle)',
+    'settings.pi_resources':'Pi Zero 2 W — Resources','settings.reserve':'Reserve','settings.cpu_load_idle':'CPU load (idle)',
     'common.error':'Error',
     'confirm.cancel_print':'Cancel the current print?','confirm.remove_printer':'Remove this printer?',
     'dash.error_code':'Error code','dash.layer':'Layer','dash.min':'min','dash.no_active_print':'No active print',
@@ -691,10 +681,7 @@ const I18N = {
     'settings.ottoeject_calibration':'OttoEject-Kalibrierung',
     'settings.calibration_hint':'Diese Befehle bei der Ersteinrichtung von OttoEject oder nach einer Konfigurationsänderung ausführen.',
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'In Startposition für OttoEject-Kalibrierung fahren',
-    'settings.mainsail_sidebar':'Mainsail-Seitenleiste',
-    'settings.mainsail_hint_1':'OttoBridge als Link in Mainsails Seitenleiste hinzufügen über',
-    'settings.mainsail_hint_2':'Speichere dies als','settings.mainsail_hint_3':'auf dem Pi, dann Mainsail neu laden. Details in INSTALL.md.',
-    'settings.copy':'Kopieren','settings.pi_resources':'Pi Zero 2 W — Ressourcen','settings.reserve':'Reserve','settings.cpu_load_idle':'CPU-Last (Leerlauf)',
+    'settings.pi_resources':'Pi Zero 2 W — Ressourcen','settings.reserve':'Reserve','settings.cpu_load_idle':'CPU-Last (Leerlauf)',
     'common.error':'Fehler',
     'confirm.cancel_print':'Aktuellen Druck abbrechen?','confirm.remove_printer':'Diesen Drucker entfernen?',
     'dash.error_code':'Fehlercode','dash.layer':'Schicht','dash.min':'Min','dash.no_active_print':'Kein aktiver Druck',
@@ -784,10 +771,7 @@ const I18N = {
     'settings.ottoeject_calibration':'Calibrage OttoEject',
     'settings.calibration_hint':'Exécutez ces commandes lors de la première configuration d\'OttoEject ou après une modification de configuration.',
     'settings.ottoeject_home':'Origine OttoEject','settings.move_to_calib_pos':'Aller à la position de départ pour le calibrage d\'OttoEject',
-    'settings.mainsail_sidebar':'Barre latérale Mainsail',
-    'settings.mainsail_hint_1':'Ajoutez OttoBridge comme lien dans la barre latérale de Mainsail via',
-    'settings.mainsail_hint_2':'Enregistrez ceci sous','settings.mainsail_hint_3':'sur le Pi, puis rechargez Mainsail. Voir INSTALL.md pour les détails.',
-    'settings.copy':'Copier','settings.pi_resources':'Pi Zero 2 W — Ressources','settings.reserve':'Réserve','settings.cpu_load_idle':'Charge CPU (inactif)',
+    'settings.pi_resources':'Pi Zero 2 W — Ressources','settings.reserve':'Réserve','settings.cpu_load_idle':'Charge CPU (inactif)',
     'common.error':'Erreur',
     'confirm.cancel_print':'Annuler l\'impression en cours ?','confirm.remove_printer':'Supprimer cette imprimante ?',
     'dash.error_code':'Code d\'erreur','dash.layer':'Couche','dash.min':'min','dash.no_active_print':'Aucune impression active',
@@ -877,10 +861,7 @@ const I18N = {
     'settings.ottoeject_calibration':'Calibrazione OttoEject',
     'settings.calibration_hint':'Esegui questi comandi durante la configurazione iniziale di OttoEject o dopo una modifica della configurazione.',
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Vai alla posizione iniziale per la calibrazione di OttoEject',
-    'settings.mainsail_sidebar':'Barra laterale Mainsail',
-    'settings.mainsail_hint_1':'Aggiungi OttoBridge come link nella barra laterale di Mainsail tramite',
-    'settings.mainsail_hint_2':'Salva questo come','settings.mainsail_hint_3':'sul Pi, poi ricarica Mainsail. Vedi INSTALL.md per i dettagli.',
-    'settings.copy':'Copia','settings.pi_resources':'Pi Zero 2 W — Risorse','settings.reserve':'Riserva','settings.cpu_load_idle':'Carico CPU (inattivo)',
+    'settings.pi_resources':'Pi Zero 2 W — Risorse','settings.reserve':'Riserva','settings.cpu_load_idle':'Carico CPU (inattivo)',
     'common.error':'Errore',
     'confirm.cancel_print':'Annullare la stampa in corso?','confirm.remove_printer':'Rimuovere questa stampante?',
     'dash.error_code':'Codice errore','dash.layer':'Strato','dash.min':'min','dash.no_active_print':'Nessuna stampa attiva',
@@ -970,10 +951,7 @@ const I18N = {
     'settings.ottoeject_calibration':'Calibración de OttoEject',
     'settings.calibration_hint':'Ejecuta estos comandos al configurar OttoEject por primera vez o tras un cambio de configuración.',
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Ir a la posición inicial para la calibración de OttoEject',
-    'settings.mainsail_sidebar':'Barra lateral de Mainsail',
-    'settings.mainsail_hint_1':'Añade OttoBridge como enlace en la barra lateral de Mainsail mediante',
-    'settings.mainsail_hint_2':'Guarda esto como','settings.mainsail_hint_3':'en el Pi, luego recarga Mainsail. Consulta INSTALL.md para más detalles.',
-    'settings.copy':'Copiar','settings.pi_resources':'Pi Zero 2 W — Recursos','settings.reserve':'Reserva','settings.cpu_load_idle':'Carga de CPU (inactivo)',
+    'settings.pi_resources':'Pi Zero 2 W — Recursos','settings.reserve':'Reserva','settings.cpu_load_idle':'Carga de CPU (inactivo)',
     'common.error':'Error',
     'confirm.cancel_print':'¿Cancelar la impresión actual?','confirm.remove_printer':'¿Eliminar esta impresora?',
     'dash.error_code':'Código de error','dash.layer':'Capa','dash.min':'min','dash.no_active_print':'Sin impresión activa',
@@ -1087,7 +1065,6 @@ let jobsState=[];
 
 (async()=>{
   document.getElementById('hdr-host').textContent=location.host;
-  updateSnippet();
   brands=await api('GET','/api/brands')||{};
   populateBrandSelects();
   const init=await api('GET','/api/printers')||[];
@@ -1135,7 +1112,7 @@ function connectWS(){
 }
 
 function renderSysFooter(d){
-  const dot=document.getElementById('sf-dot');
+  const dot=document.getElementById('sf-eject-dot');
   if(!dot)return;
   if(!d||d.connected===false){
     dot.className='dot offline';
@@ -1229,6 +1206,7 @@ function selectDash(pid){
 function renderDash(){
   const p=S[dashPid];if(!p)return;
   setDot(p.connected,p.connected?p.status:'Offline');
+  updateFooterPrinterStatus(p);
   setText('s-state',p.status);
   const se=document.getElementById('s-state');
   if(se)se.style.color={RUNNING:'var(--yel)',FINISH:'var(--grn)',FAILED:'var(--red)'}[p.status]||'var(--txt)';
@@ -1239,7 +1217,7 @@ function renderDash(){
   setText('t-bed-tgt',p.bed_target!=null?`→ ${fmt1(p.bed_target)}°`:'');
   const pct=p.progress!=null?Math.min(100,Math.max(0,p.progress)):0;
   document.getElementById('s-bar').style.width=pct+'%';
-  setText('s-filename',p.filename||t('dash.no_active_print'));
+  setText('s-filename',p.filename||p.status||t('dash.no_active_print'));
   setText('s-layers',(p.layer_num!=null&&p.total_layer_num!=null)?`${t('dash.layer')} ${p.layer_num} / ${p.total_layer_num}`:'—');
   setText('s-remaining',p.remaining_min!=null?`${p.remaining_min} ${t('dash.min')}`:'—');
   const ec=document.getElementById('error-card');
@@ -1263,6 +1241,15 @@ function setDot(on,lbl){
   else if(on){const busy=['RUNNING','PAUSED','PREPARE'].includes(lbl);d.classList.add(busy?'busy':'online');}
   else d.classList.add('offline');
   l.textContent=lbl;
+}
+
+function updateFooterPrinterStatus(p){
+  const dot=document.getElementById('sf-printer-dot'), nameEl=document.getElementById('sf-printer-name');
+  if(!dot||!nameEl)return;
+  if(!p){dot.className='dot';nameEl.textContent='—';return;}
+  const busy=['RUNNING','PAUSED','PREPARE'].includes(p.status);
+  dot.className=p.connected?(busy?'dot busy':'dot online'):'dot offline';
+  nameEl.textContent=p.name||'—';
 }
 
 async function ctrl(action){
@@ -2079,7 +2066,11 @@ function updateCalibHint(){
   const hint=document.getElementById('calib-cmd-hint');
   const btn=document.getElementById('calib-z-btn');
   if(hint)hint.textContent=isCoreXY?`Z → 200mm: G1 Z200 F3000 (CoreXY)`:`Y → ${ymax}mm: G1 Y${ymax} F6000 (Cartesian)`;
-  if(btn)btn.textContent=isCoreXY?'Z → 200mm':`Y → ${ymax}mm`;
+  if(btn)btn.textContent=isCoreXY?'Drucker Z → 200mm':`Drucker Y → ${ymax}mm`;
+  const m=printer.macros||{};
+  const pickBtn=document.getElementById('calib-pick-btn'), storeBtn=document.getElementById('calib-store-btn');
+  if(pickBtn)pickBtn.title=m.eject||'—';
+  if(storeBtn)storeBtn.title=m.load||'—';
 }
 
 async function sendCalibMove(){
@@ -2092,30 +2083,30 @@ async function sendCalibMove(){
   const cmd=isCoreXY?'G1 Z200 F3000':`G1 Y${ymax} F6000`;
   logG(cmd,'sent');await api('POST','/api/gcode',{printer_id:pid,command:cmd});
 }
+async function sendCalibPick(){
+  const pid=document.getElementById('console-printer').value;
+  if(!pid){toast('err',t('toast.select_printer'));return;}
+  const m=S[pid]?.macros?.eject;
+  if(!m){toast('err',t('eject.not_available'));return;}
+  logG(m,'sent');
+  const r=await api('POST',`/api/ottoeject/eject/${pid}`);
+  if(r?.ok)toast('ok',`${t('toast.eject_sent')} ✓`);
+}
+async function sendCalibStore(){
+  const pid=document.getElementById('console-printer').value;
+  if(!pid){toast('err',t('toast.select_printer'));return;}
+  const m=S[pid]?.macros?.load;
+  if(!m){toast('err',t('eject.not_available'));return;}
+  logG(m,'sent');
+  const r=await api('POST',`/api/ottoeject/load/${pid}`);
+  if(r?.ok)toast('ok',`${t('toast.load_sent')} ✓`);
+}
 function logG(line,type){
   const log=document.getElementById('gcode-log');
   const d=document.createElement('div');
   d.className=type==='sent'?'log-sent':type==='err'?'log-err':'log-info';
   d.textContent=`${new Date().toLocaleTimeString()} ${type==='sent'?'→':'←'} ${line}`;
   log.appendChild(d);log.scrollTop=log.scrollHeight;
-}
-
-// ── MAINSAIL SNIPPET ─────────────────────────────────────────────────────────
-function updateSnippet(){
-  const port=location.port||'8080';
-  document.getElementById('mainsail-snippet').textContent=
-`[
-  {
-    "title": "OttoBridge",
-    "href": "http://localhost:${port}",
-    "target": "_blank",
-    "position": 95
-  }
-]`;
-}
-async function copySnippet(){
-  await navigator.clipboard.writeText(document.getElementById('mainsail-snippet').textContent).catch(()=>{});
-  toast('ok',t('toast.copied'));
 }
 
 // ── UTILS ────────────────────────────────────────────────────────────────────
@@ -2155,7 +2146,6 @@ function switchTab(name){
   if(name==='eject'){onEjectPrinter();loadKlipper();}
   if(name==='rack'){renderRack();}
   if(name==='console')updateCalibHint();
-  if(name==='settings')updateSnippet();
 }
 
 const dz=document.getElementById('drop-zone');
