@@ -1952,10 +1952,44 @@ async def free_grab_slot(slot: int):
 
 # ── OttoEject routes ──────────────────────────────────────────────────────────
 async def _run_klipper(macro: str):
+    """Moonraker's /printer/gcode/script blocks its HTTP response until the
+    ENTIRE gcode script (macro) has finished executing on the board — not
+    just until it's been queued. A full OTTOeject sequence (open door, move
+    into position, grab/release, retract) routinely takes well over a
+    minute. Rather than guessing with a single long fixed timeout (either
+    too short → false ERROR while the macro is still legitimately running,
+    or too long → we wait needlessly even when something's genuinely stuck),
+    we give the initial call 60s, and if it times out we actively poll
+    Moonraker's idle_timeout.state — Klipper's own "gcode is actively
+    executing" signal (the same one Mainsail/Fluidd use for their busy
+    indicator) — and only report failure once the board is genuinely no
+    longer moving, or Klipper itself reports an error/shutdown. Confirmed
+    directly: the eject step was marked ERROR while the door had already
+    opened and the plate had already been picked physically — the macro was
+    simply still executing past our old fixed timeout, not actually failing."""
     try:
-        async with httpx.AsyncClient(timeout=15) as c:
+        async with httpx.AsyncClient(timeout=60) as c:
             r = await c.post(f"{MOONRAKER_URL}/printer/gcode/script", json={"script": macro})
         return {"ok": r.status_code == 200, "macro": macro}
+    except httpx.TimeoutException:
+        log.info(f"gcode/script timed out for '{macro}' after 60s — polling idle_timeout instead of failing outright…")
+        for _ in range(60):  # poll for up to ~5 more minutes
+            await asyncio.sleep(5)
+            try:
+                async with httpx.AsyncClient(timeout=10) as c:
+                    r = await c.get(f"{MOONRAKER_URL}/printer/objects/query",
+                                     params={"idle_timeout": "", "webhooks": ""})
+                st = r.json().get("result", {}).get("status", {})
+                if st.get("webhooks", {}).get("state") in ("error", "shutdown"):
+                    log.error(f"Klipper reported {st['webhooks']['state']} while running '{macro}'")
+                    return {"ok": False, "macro": macro}
+                if st.get("idle_timeout", {}).get("state") != "Printing":
+                    log.info(f"'{macro}' finished — idle_timeout left 'Printing' state")
+                    return {"ok": True, "macro": macro}
+            except Exception as e:
+                log.debug(f"idle_timeout poll during '{macro}': {e}")
+        log.error(f"'{macro}' still running after extended wait — giving up")
+        return {"ok": False, "macro": macro}
     except Exception as e: raise HTTPException(503, f"Moonraker: {e}")
 
 COREXY_MODELS = {
