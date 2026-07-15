@@ -1310,6 +1310,16 @@ async def clear_err(req: PidOnly):
         # actually clearing it.
         ok2 = await bambu_publish(req.printer_id, {"print":{
             "command":"stop","sequence_id":_seq()}})
+        # Neither command above guarantees the printer sends a fresh full
+        # status report afterward — Bambu only pushes unprompted on state
+        # transitions IT decides are worth announcing. Without explicitly
+        # re-requesting one, our cached gcode_state can stay stuck on FAILED
+        # indefinitely even though the printer is already idle again (this
+        # was directly observed: printer's own touchscreen showed "Ready to
+        # print" while our dashboard kept showing FAILED after clicking this
+        # button). A short delay lets stop/clean_print_error land first.
+        await asyncio.sleep(1)
+        await bambu_publish(req.printer_id, {"pushing": {"command": "pushall"}})
         return {"ok": ok1 or ok2}
     return {"ok": False}
 
