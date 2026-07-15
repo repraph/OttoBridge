@@ -1432,7 +1432,14 @@ class QueueManager:
         self.error_msg = ""
         self.task: Optional[asyncio.Task] = None
         self.home_done = False      # OTTOEJECT_HOME + printer home — once per queue start
-        self.door_opened_job_id: Optional[str] = None  # which job's OPEN_DOOR already ran
+        # Tracks the ONE printer (if any) currently left door-open + Z-safe-pos
+        # by the immediately preceding job's successful eject — set right after
+        # a successful "eject" step, consumed (read + cleared) by the very next
+        # job's "grab_parallel" step. Chains naturally: job2 skips redoing
+        # door/move if job1 (immediately before it) ejected the same printer;
+        # job3 does the same relative to job2; a different printer or a failed
+        # eject breaks the chain, and that job falls back to doing both steps.
+        self.last_safe_printer_id: Optional[str] = None
 
     def _steps(self, job: dict) -> list[str]:
         if job.get("grab_slot") and not (self.retry_from_print and job["id"] == self.cur_job_id):
@@ -1460,7 +1467,7 @@ class QueueManager:
         self.retry_from_print = False
         self.error_msg = ""
         self.home_done = False
-        self.door_opened_job_id = None
+        self.last_safe_printer_id = None
         self.task = asyncio.create_task(self._run())
         return True
 
@@ -1624,15 +1631,21 @@ class QueueManager:
         if not p: return False
         try:
             if step == "grab_parallel":
+                # Skip re-opening the door AND re-moving to safe pos entirely if
+                # the immediately preceding job already left THIS printer in
+                # that state via its own successful eject (see
+                # last_safe_printer_id docs in __init__). Consumed immediately
+                # on read — only valid for one job, refreshed by this job's own
+                # eject step if/when it gets there.
+                already_safe = (self.last_safe_printer_id == pid)
+                self.last_safe_printer_id = None
+                if already_safe:
+                    return await self._grab_from_slot(job)
                 # Phase 1 (parallel): open door + move to safe pos.
                 # These two can run simultaneously — neither moves toward the plate.
-                # Door open is only needed for the very first job of the queue;
-                # later jobs already have the door open from the previous EJECT_FROM_<PRINTER>.
-                is_first_job = (self.door_opened_job_id is None)
                 phase1 = [self._move_to_safe_pos(pid, p)]
-                if is_first_job and has_door(p.brand, p.model):
+                if has_door(p.brand, p.model):
                     phase1.append(self._open_door(p))
-                    self.door_opened_job_id = job["id"]
                 results1 = await asyncio.gather(*phase1, return_exceptions=True)
                 if not all((r is True) for r in results1):
                     return False
@@ -1682,7 +1695,13 @@ class QueueManager:
                 m = get_eject_macro(p.brand, p.model)
                 if not m: return False
                 r = await _run_klipper(m)
-                return bool(r.get("ok"))
+                ok = bool(r.get("ok"))
+                if ok:
+                    # EJECT_FROM_<PRINTER> leaves the door open and the printer
+                    # in Z-safe-pos — the next job's grab_parallel step (if it's
+                    # for this same printer) can skip redoing both.
+                    self.last_safe_printer_id = pid
+                return ok
             if step == "store":
                 r = await _run_klipper(f"STORE_TO_SLOT_{job['park_slot']}")
                 return bool(r.get("ok"))
