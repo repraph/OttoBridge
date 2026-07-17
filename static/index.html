@@ -2053,7 +2053,7 @@ async function qg(cmd){
   logG(cmd,'sent');await api('POST','/api/gcode',{printer_id:pid,command:cmd});
 }
 
-const COREXY_MODELS=new Set(['X1C','P1S','P1P','A1','A1 Mini','P2S','Core One','K1C','K1','K1 Max','Kobra S1','Centauri Carbon','Centauri','AD5X','Adventurer 5M Pro','Adventurer 5M','Generic Klipper']);
+const COREXY_MODELS=new Set(['X1C','X2D','P1S','P1P','A1','A1 Mini','P2S','Core One','K1C','K1','K1 Max','Kobra S1','Centauri Carbon','Centauri','AD5X','Adventurer 5M Pro','Adventurer 5M','Generic Klipper']);
 const Y_MAX_MM={'MK3S':210,'MK3':210,'MK4S':250,'MK4':250};
 
 function updateCalibHint(){
