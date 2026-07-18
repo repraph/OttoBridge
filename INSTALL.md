@@ -59,40 +59,32 @@ When it's done, you'll see something like:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   → http://192.168.1.50:8080
   Logs: sudo journalctl -u ottobridge -f
+  Mainsail: reload the sidebar to see the OttoBridge link
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 ---
 
-## Step 3 — Add OttoBridge to Mainsail (do this now)
+## Step 3 — Mainsail sidebar link (automatic)
 
-Before going further, add OttoBridge as a link in Mainsail's sidebar so you can always find it.
-
-Create the theme folder if it doesn't exist yet:
-
-```bash
-mkdir -p ~/printer_data/config/.theme
-nano ~/printer_data/config/.theme/navi.json
-```
-
-Add the following content:
+`install.sh` now adds OttoBridge as a link in Mainsail's sidebar for you — no manual editing needed. It writes (or updates) `~/printer_data/config/.theme/navi.json`:
 
 ```json
 [
   {
     "title": "OttoBridge",
-    "href": "http://ottomk.local:8080",
+    "href": "http://<your-pi-hostname>.local:8080",
     "target": "_blank",
     "position": 95
   }
 ]
 ```
 
-Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`). Reload Mainsail in your browser — OttoBridge now appears as a link near the bottom of the sidebar and opens in a new tab.
+using your Pi's mDNS hostname (`$(hostname).local`) rather than a raw IP, since a DHCP-assigned IP can change but the `.local` name stays stable. If you already had other entries in `navi.json`, they're preserved — the installer only adds/updates the OttoBridge entry, and never creates duplicates on repeat runs.
 
-> Replace `ottomk.local` with your Pi's actual hostname or IP address if different. `localhost` does not work here, since the link is opened by your browser, not by the Pi itself.
+Reload Mainsail in your browser afterward — OttoBridge appears as a link near the bottom of the sidebar and opens in a new tab.
 
-> If you already have other entries in `navi.json`, add the OttoBridge object to the existing array instead of replacing the file.
+> **Want a different hostname, or don't use Mainsail?** Just edit `~/printer_data/config/.theme/navi.json` by hand — the installer only touches the `"title": "OttoBridge"` entry and leaves everything else alone. If `~/printer_data/config` doesn't exist at all (no Mainsail/Moonraker on this Pi), the installer skips this step automatically.
 
 ---
 
@@ -106,13 +98,15 @@ http://<your-pi-ip>:8080
 
 You should see the OttoBridge dashboard.
 
+> From now on, you can also open OttoBridge directly from Mainsail's sidebar (the link added automatically in Step 3) instead of typing the address each time.
+
 ---
 
 ## Step 5 — Connect your printer
 
 Go to the **Printer** tab and fill in your printer details:
 
-**Bambu Lab (X1C, P1S, P1P, A1, P2S):**
+**Bambu Lab (X1C, X2D, P1S, P1P, A1, A1 Mini, P2S):**
 - Brand: `Bambu Lab`
 - Model: select your model
 - IP Address: your printer's IP (shown in printer Settings → Network)
@@ -124,10 +118,20 @@ Go to the **Printer** tab and fill in your printer details:
 - IP Address: your printer's IP
 - API Key: shown in Mainsail/Fluidd → PrusaLink settings
 
-**Anycubic / Elegoo / Creality:**
+**Elegoo (Centauri Carbon):**
+- Brand: `Elegoo`
+- IP Address: your printer's IP
+- No additional credentials needed — talks directly to the printer's native SDCP protocol, no custom firmware or Klipper required
+
+**Creality (K1C, K1, K1 Max) / Generic Klipper printers:**
 - Brand: select your brand
 - IP Address: your printer's IP
-- No additional credentials needed (Klipper/Moonraker handles auth)
+- No additional credentials needed — connects to the printer's own Moonraker instance
+
+**Anycubic (Kobra S1):**
+- Brand: `Anycubic`
+- IP Address: your printer's IP
+- Requires the [Rinkhals](https://github.com/jbatonnet/Rinkhals) custom firmware overlay installed first — stock Anycubic firmware has no usable local API. Rinkhals installs a real Moonraker instance on top of the stock firmware (non-destructive), which is what OttoBridge talks to.
 
 Click **Connect**. The status dot turns green when the connection is successful.
 
