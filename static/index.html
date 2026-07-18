@@ -313,7 +313,7 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
     <!-- New job form -->
     <div>
       <div class="sec-title" data-i18n="jobs.new_job">New Job</div>
-      <div class="field"><label data-i18n="jobs.printer">Printer</label><select id="job-printer"></select></div>
+      <div class="field"><label data-i18n="jobs.printer">Printer</label><select id="job-printer" onchange="updateJobBambuOptions()"></select></div>
 
       <div class="drop-zone" id="job-dz" onclick="document.getElementById('job-gf').click()">
         <input type="file" id="job-gf" accept=".gcode,.3mf" onchange="analyzeUpload(this.files[0])">
@@ -324,6 +324,7 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
       <div id="job-file-info" style="display:none;margin-bottom:10px"></div>
       <div id="job-file-err" style="display:none;color:var(--red);font-size:10px;margin-bottom:10px"></div>
 
+      <div id="job-bambu-options">
       <div class="field"><label data-i18n="jobs.bed_type">Bed Type</label>
         <select id="job-bed">
           <option value="textured_plate" data-i18n="jobs.bed.textured">Textured Plate</option>
@@ -333,12 +334,13 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
         </select>
       </div>
 
-      <div class="toggle-row"><span class="toggle-label" data-i18n="jobs.use_ams">Use AMS</span><label class="toggle"><input type="checkbox" id="job-ams"><div class="toggle-slider"></div></label></div>
+      <div class="toggle-row" id="job-ams-row"><span class="toggle-label" data-i18n="jobs.use_ams">Use AMS</span><label class="toggle"><input type="checkbox" id="job-ams"><div class="toggle-slider"></div></label></div>
       <div class="toggle-row"><span class="toggle-label" data-i18n="jobs.bed_leveling">Bed Leveling</span><label class="toggle"><input type="checkbox" id="job-level" checked><div class="toggle-slider"></div></label></div>
       <div class="toggle-row"><span class="toggle-label" data-i18n="jobs.flow_calibration">Flow Calibration</span><label class="toggle"><input type="checkbox" id="job-flow" checked><div class="toggle-slider"></div></label></div>
       <div class="toggle-row"><span class="toggle-label" data-i18n="jobs.vibration_calib">Vibration Calib.</span><label class="toggle"><input type="checkbox" id="job-vibr" checked><div class="toggle-slider"></div></label></div>
-      <div class="toggle-row"><span class="toggle-label" data-i18n="jobs.lidar_inspection">Lidar Inspection</span><label class="toggle"><input type="checkbox" id="job-lidar" checked><div class="toggle-slider"></div></label></div>
+      <div class="toggle-row" id="job-lidar-row"><span class="toggle-label" data-i18n="jobs.lidar_inspection">Lidar Inspection</span><label class="toggle"><input type="checkbox" id="job-lidar" checked><div class="toggle-slider"></div></label></div>
       <div class="toggle-row"><span class="toggle-label" data-i18n="jobs.timelapse">Timelapse</span><label class="toggle"><input type="checkbox" id="job-timelapse"><div class="toggle-slider"></div></label></div>
+      </div>
 
       <div class="divider"></div>
       <div class="sec-title" style="font-size:10px;margin-bottom:10px" data-i18n="jobs.plate_before_print">Plate Before Print</div>
@@ -522,6 +524,7 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
       <button class="btn btn-sm" onclick="qg('OTTOEJECT_HOME')" title="G28 Y → G28 X → G28 Z → G1 Y10 X10 Z10" data-i18n="settings.ottoeject_home">OttoEject Home</button>
       <button class="btn btn-sm" onclick="qg('PARK_OTTOEJECT')" data-i18n="console.park_ottoeject">Park OttoEject</button>
       <button class="btn btn-sm" id="calib-z-btn" onclick="sendCalibMove()" data-i18n-title="settings.move_to_calib_pos" title="Move to starting position for OttoEject calibration">Drucker Z → 200mm</button>
+      <button class="btn btn-sm" onclick="sendCalibHome()" data-i18n="settings.printer_home">Drucker Home</button>
       <button class="btn btn-sm" id="calib-pick-btn" onclick="sendCalibPick()" data-i18n="eject.eject_from_printer">Eject from printer</button>
       <button class="btn btn-sm" id="calib-store-btn" onclick="sendCalibStore()" data-i18n="eject.load_onto_printer">Load onto printer</button>
     </div>
@@ -591,6 +594,7 @@ const I18N = {
     'settings.ottoeject_calibration':'OttoEject Calibration',
     'settings.calibration_hint':'Run these commands when setting up OttoEject for the first time or after a configuration change.',
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Move to starting position for OttoEject calibration',
+    'settings.printer_home':'Printer Home',
     'settings.pi_resources':'Pi Zero 2 W — Resources','settings.reserve':'Reserve','settings.cpu_load_idle':'CPU load (idle)',
     'common.error':'Error',
     'confirm.cancel_print':'Cancel the current print?','confirm.remove_printer':'Remove this printer?',
@@ -681,6 +685,7 @@ const I18N = {
     'settings.ottoeject_calibration':'OttoEject-Kalibrierung',
     'settings.calibration_hint':'Diese Befehle bei der Ersteinrichtung von OttoEject oder nach einer Konfigurationsänderung ausführen.',
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'In Startposition für OttoEject-Kalibrierung fahren',
+    'settings.printer_home':'Drucker Home',
     'settings.pi_resources':'Pi Zero 2 W — Ressourcen','settings.reserve':'Reserve','settings.cpu_load_idle':'CPU-Last (Leerlauf)',
     'common.error':'Fehler',
     'confirm.cancel_print':'Aktuellen Druck abbrechen?','confirm.remove_printer':'Diesen Drucker entfernen?',
@@ -771,6 +776,7 @@ const I18N = {
     'settings.ottoeject_calibration':'Calibrage OttoEject',
     'settings.calibration_hint':'Exécutez ces commandes lors de la première configuration d\'OttoEject ou après une modification de configuration.',
     'settings.ottoeject_home':'Origine OttoEject','settings.move_to_calib_pos':'Aller à la position de départ pour le calibrage d\'OttoEject',
+    'settings.printer_home':'Origine imprimante',
     'settings.pi_resources':'Pi Zero 2 W — Ressources','settings.reserve':'Réserve','settings.cpu_load_idle':'Charge CPU (inactif)',
     'common.error':'Erreur',
     'confirm.cancel_print':'Annuler l\'impression en cours ?','confirm.remove_printer':'Supprimer cette imprimante ?',
@@ -861,6 +867,7 @@ const I18N = {
     'settings.ottoeject_calibration':'Calibrazione OttoEject',
     'settings.calibration_hint':'Esegui questi comandi durante la configurazione iniziale di OttoEject o dopo una modifica della configurazione.',
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Vai alla posizione iniziale per la calibrazione di OttoEject',
+    'settings.printer_home':'Home stampante',
     'settings.pi_resources':'Pi Zero 2 W — Risorse','settings.reserve':'Riserva','settings.cpu_load_idle':'Carico CPU (inattivo)',
     'common.error':'Errore',
     'confirm.cancel_print':'Annullare la stampa in corso?','confirm.remove_printer':'Rimuovere questa stampante?',
@@ -951,6 +958,7 @@ const I18N = {
     'settings.ottoeject_calibration':'Calibración de OttoEject',
     'settings.calibration_hint':'Ejecuta estos comandos al configurar OttoEject por primera vez o tras un cambio de configuración.',
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Ir a la posición inicial para la calibración de OttoEject',
+    'settings.printer_home':'Origen impresora',
     'settings.pi_resources':'Pi Zero 2 W — Recursos','settings.reserve':'Reserva','settings.cpu_load_idle':'Carga de CPU (inactivo)',
     'common.error':'Error',
     'confirm.cancel_print':'¿Cancelar la impresión actual?','confirm.remove_printer':'¿Eliminar esta impresora?',
@@ -1195,6 +1203,7 @@ function updateSelects(plist){
   });
   onEjectPrinter();
   updateCalibHint();
+  updateJobBambuOptions();
 }
 
 function selectDash(pid){
@@ -2056,6 +2065,27 @@ async function qg(cmd){
 const COREXY_MODELS=new Set(['X1C','X2D','P1S','P1P','A1','A1 Mini','P2S','Core One','K1C','K1','K1 Max','Kobra S1','Centauri Carbon','Centauri','AD5X','Adventurer 5M Pro','Adventurer 5M','Generic Klipper']);
 const Y_MAX_MM={'MK3S':210,'MK3':210,'MK4S':250,'MK4':250};
 
+function updateJobBambuOptions(){
+  const pid=document.getElementById('job-printer')?.value;
+  const printer=S[pid];
+  const box=document.getElementById('job-bambu-options');
+  if(!box)return;
+  const brand=(printer?.brand||'').toLowerCase();
+  const isBambu=brand.includes('bambu');
+  box.style.display=isBambu?'':'none';
+  if(!isBambu)return;
+  const model=printer.model||'';
+  // AMS: every Bambu model except A1 Mini (no full/lite AMS support)
+  const amsRow=document.getElementById('job-ams-row');
+  if(amsRow)amsRow.style.display=(model==='A1 Mini')?'none':'';
+  // Lidar first-layer inspection: X-series + P2S only — P1S/P1P/A1/A1 Mini use a
+  // plain vibration/capacitive sensor instead and have no lidar hardware at all.
+  const lidarRow=document.getElementById('job-lidar-row');
+  const hasLidar=['X1C','X2D','P2S'].includes(model);
+  if(lidarRow)lidarRow.style.display=hasLidar?'':'none';
+  if(!hasLidar){const cb=document.getElementById('job-lidar'); if(cb)cb.checked=false;}
+}
+
 function updateCalibHint(){
   const pid=document.getElementById('console-printer')?.value;
   const printer=S[pid];
@@ -2082,6 +2112,11 @@ async function sendCalibMove(){
   const ymax=Y_MAX_MM[model]||210;
   const cmd=isCoreXY?'G1 Z200 F3000':`G1 Y${ymax} F6000`;
   logG(cmd,'sent');await api('POST','/api/gcode',{printer_id:pid,command:cmd});
+}
+async function sendCalibHome(){
+  const pid=document.getElementById('console-printer').value;
+  if(!pid){toast('err',t('toast.select_printer'));return;}
+  logG('G28','sent');await api('POST','/api/gcode',{printer_id:pid,command:'G28'});
 }
 async function sendCalibPick(){
   const pid=document.getElementById('console-printer').value;
