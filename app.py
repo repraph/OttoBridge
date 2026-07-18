@@ -472,13 +472,20 @@ async def moonraker_poll_loop(pid: str):
 async def prusa_poll_loop(pid: str):
     p = printers.get(pid)
     if not p: return
-    base = f"http://{p.ip}"; headers = {"X-Api-Key": p.api_key}
+    base = f"http://{p.ip}"
+    # PrusaLink's /api/v1/* endpoints require HTTP Digest auth (username
+    # "maker", password = the API key) per the official OpenAPI spec — NOT a
+    # plain X-Api-Key header. X-Api-Key only works on the legacy /api/job,
+    # /api/printer, /api/version endpoints, not /api/v1/*. This matches
+    # widely-reported "HTTP 403: Bad X-Api-Key" errors on real Buddy-firmware
+    # printers (MK4/MK3.9/Core One/MINI/XL) whose fix was switching to digest.
+    auth = httpx.DigestAuth("maker", p.api_key)
     log.info(f"[{p.name}] PrusaLink poll {base}")
-    _SM = {"IDLE":"IDLE","PRINTING":"RUNNING","PAUSED":"PAUSED","FINISHED":"FINISH","ERROR":"FAILED","ATTENTION":"PAUSED"}
+    _SM = {"IDLE":"IDLE","PRINTING":"RUNNING","PAUSED":"PAUSED","FINISHED":"FINISH","ERROR":"FAILED","ATTENTION":"PAUSED","STOPPED":"STOPPED"}
     while printers.get(pid):
         try:
             async with httpx.AsyncClient(timeout=8) as c:
-                r = await c.get(f"{base}/api/v1/status", headers=headers)
+                r = await c.get(f"{base}/api/v1/status", auth=auth)
             if r.status_code == 200:
                 d = r.json(); job = d.get("job", {}); prn = d.get("printer", {})
                 p.status        = _SM.get(prn.get("state", ""), "UNKNOWN")
@@ -763,7 +770,8 @@ async def prusa_upload(pid, local_path, remote_name):
         async with httpx.AsyncClient(timeout=60) as c:
             with open(local_path, "rb") as f:
                 r = await c.put(f"http://{p.ip}/api/v1/files/usb/{remote_name}",
-                    content=f.read(), headers={"X-Api-Key": p.api_key, "Content-Type":"application/octet-stream"})
+                    content=f.read(), auth=httpx.DigestAuth("maker", p.api_key),
+                    headers={"Content-Type":"application/octet-stream"})
         return r.status_code in (200, 201, 204, 409)
     except Exception as e: log.error(f"FTP prusa: {e}"); return False
 
@@ -1039,7 +1047,7 @@ async def test_printer_connection(cfg: TestConnCfg):
             return {"ok": True, "message": "FTP login successful"}
         elif proto == "prusalink":
             async with httpx.AsyncClient(timeout=8) as c:
-                r = await c.get(f"http://{cfg.ip}/api/v1/status", headers={"X-Api-Key": api_key})
+                r = await c.get(f"http://{cfg.ip}/api/v1/status", auth=httpx.DigestAuth("maker", api_key))
             return {"ok": r.status_code == 200, "message": f"HTTP {r.status_code}" if r.status_code != 200 else "PrusaLink reachable"}
         elif proto == "moonraker":
             async with httpx.AsyncClient(timeout=8) as c:
@@ -1246,7 +1254,7 @@ async def start_print(req: StartPrint):
         try:
             async with httpx.AsyncClient(timeout=10) as c:
                 r = await c.post(f"http://{p.ip}/api/v1/print",
-                    headers={"X-Api-Key":p.api_key}, json={"path":f"/usb/{req.filename}"})
+                    auth=httpx.DigestAuth("maker", p.api_key), json={"path":f"/usb/{req.filename}"})
             ok = r.status_code in (200,201,204)
         except Exception as e: raise HTTPException(503, str(e))
     elif p.protocol in ("moonraker","websocket"):
@@ -1282,7 +1290,7 @@ async def _ctrl(pid, cmd):
         cm = {"pause":"PAUSE","resume":"RESUME","stop":"CANCEL"}.get(cmd, cmd.upper())
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.put(f"http://{p.ip}/api/v1/job",
-                headers={"X-Api-Key":p.api_key}, json={"command":cm})
+                auth=httpx.DigestAuth("maker", p.api_key), json={"command":cm})
         return r.status_code in (200,204)
     elif p.protocol in ("moonraker","websocket"):
         gc = {"pause":"PAUSE","resume":"RESUME","stop":"CANCEL_PRINT"}.get(cmd, cmd.upper())
