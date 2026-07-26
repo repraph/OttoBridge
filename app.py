@@ -1,6 +1,6 @@
 """
-OttoBridge v2 — Multi-Printer Orchestrator
-Supports: Bambu Lab (X1C, P1S, P1P, A1, P2S), Prusa (MK3/MK4/Core One),
+OttoBridge — Multi-Printer Orchestrator
+Supports: Bambu Lab (X1C, X2D, P1S, P1P, A1, A1 Mini, P2S), Prusa (MK3/MK4/Core One),
           Creality (K1C), Anycubic (Kobra S1), Elegoo (Centauri Carbon),
           FlashForge (AD5X, Adventurer 5M Pro), Klipper/Moonraker (generic)
 Pi Zero 2 W — runs alongside Klipper + Moonraker
@@ -914,7 +914,7 @@ async def lifespan(app: FastAPI):
     for t in mqtt_tasks.values():
         if not t.done(): t.cancel()
 
-app = FastAPI(title="OttoBridge v2", lifespan=lifespan)
+app = FastAPI(title="OttoBridge", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 @app.get("/api/system/stats")
@@ -1611,6 +1611,7 @@ class QueueManager:
                 if not job:
                     self.state = "idle"; return
                 job["status"] = "running"
+                save_config()
                 await broadcast("queue", self.to_dict())
                 steps = self._steps(job)
 
@@ -1939,6 +1940,26 @@ async def del_job(jid: str):
     save_config()
     await broadcast("rack", rack.to_dict())
     return {"ok": True}
+
+@app.delete("/api/jobs")
+async def clear_queue():
+    """Bulk-remove all WAITING ('queued') jobs and free their reserved slots
+    — a quick 'clear queue' action instead of deleting one by one. Only
+    allowed while the queue itself is idle (mirrors the single-job delete's
+    precondition, so nothing mid-flight gets yanked out from under the
+    runner). Deliberately leaves done/error/aborted/skipped jobs alone —
+    that job history is exactly what should survive a queue clear, not be
+    wiped by it."""
+    global jobs
+    if queue_mgr.state != "idle":
+        raise HTTPException(409, "Queue must be idle to clear it")
+    to_remove = [j for j in jobs if j["status"] == "queued"]
+    for j in to_remove:
+        rack.free_job_slots(j["id"])
+    jobs = [j for j in jobs if j["status"] != "queued"]
+    save_config()
+    await broadcast("rack", rack.to_dict())
+    return {"ok": True, "removed": len(to_remove)}
 
 @app.post("/api/queue/start")
 async def queue_start():

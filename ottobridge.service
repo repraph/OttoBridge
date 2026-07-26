@@ -1,5 +1,5 @@
 [Unit]
-Description=OttoBridge v2 – Multi-Printer + OttoEject Web Interface
+Description=OttoBridge – Multi-Printer + OttoEject Web Interface
 After=network.target moonraker.service
 Wants=moonraker.service
 

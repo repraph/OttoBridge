@@ -5,7 +5,7 @@ INSTALL_DIR="/home/pi/ottobridge"
 SOURCE_DIR="$(pwd)"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  OttoBridge v2 Installer"
+echo "  OttoBridge Installer"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 echo "[1/7] System packages…"
@@ -22,6 +22,7 @@ sudo rsync -a --delete \
   --exclude 'venv' \
   --exclude 'uploads' \
   --exclude 'gcode_profiles' \
+  --exclude 'config.json' \
   "$SOURCE_DIR"/ "$INSTALL_DIR"/
 sudo chown -R pi:pi "$INSTALL_DIR"
 
