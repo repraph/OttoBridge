@@ -256,6 +256,7 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
   <!-- Queue control bar -->
   <div style="display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--brd);margin-bottom:14px;flex-wrap:wrap">
     <button class="btn btn-acc" id="btn-q-start" onclick="queueStart()" style="padding:12px 28px;font-size:15px;font-weight:700">▶ <span data-i18n="jobs.start_queue">Start queue</span></button>
+    <button class="btn" id="btn-q-clear" onclick="confirmClearQueue()" style="padding:10px 18px;font-size:13px">✕ <span data-i18n="jobs.clear_queue">Clear queue</span></button>
     <button class="btn btn-yel" id="btn-q-pause" onclick="queuePause()" style="display:none;padding:10px 22px;font-size:14px">⏸ <span data-i18n="dash.pause">Pause</span></button>
     <button class="btn btn-blu" id="btn-q-resume" onclick="queueResume()" style="display:none;padding:10px 22px;font-size:14px">▶ <span data-i18n="dash.resume">Resume</span></button>
     <button class="btn btn-danger" id="btn-q-stop" onclick="queueStop()" style="display:none;padding:10px 22px;font-size:14px">⏹ <span data-i18n="dash.stop">Stop</span></button>
@@ -626,6 +627,10 @@ const I18N = {
     'toast.drop_file_first':'Please drop a .gcode/.3mf file first','toast.eject_sent':'Eject sequence sent',
     'toast.load_sent':'Load macro sent','toast.name_brand_ip_required':'Name, brand and IP are required',
     'toast.printer_removed':'Printer removed','toast.queue_stopped':'Queue stopped — slots freed',
+    'jobs.clear_queue':'Clear queue',
+    'confirm.clear_queue':'Remove all {n} waiting job(s) from the queue? Job history (done/aborted/skipped) is kept.',
+    'toast.queue_cleared':'waiting job(s) removed from the queue',
+    'toast.queue_already_empty':'Queue has no waiting jobs to clear',
     'toast.queued_slots_locked':'queued — slots locked','toast.saved':'saved',
     'toast.select_park_slot':'Please select a park slot','toast.select_pick_slot':'Please select a pick slot',
     'toast.select_printer':'Please select a printer','toast.slot_cleared':'Slot {n} cleared — blocked slots freed',
@@ -718,6 +723,10 @@ const I18N = {
     'toast.drop_file_first':'Bitte zuerst eine .gcode/.3mf Datei ablegen','toast.eject_sent':'Auswurf-Sequenz gesendet',
     'toast.load_sent':'Lade-Makro gesendet','toast.name_brand_ip_required':'Name, Marke und IP sind erforderlich',
     'toast.printer_removed':'Drucker entfernt','toast.queue_stopped':'Warteschlange gestoppt — Plätze freigegeben',
+    'jobs.clear_queue':'Warteschlange leeren',
+    'confirm.clear_queue':'Alle {n} wartenden Auftrag/Aufträge aus der Warteschlange entfernen? Der Verlauf (fertig/abgebrochen/übersprungen) bleibt erhalten.',
+    'toast.queue_cleared':'wartende(r) Auftrag/Aufträge aus der Warteschlange entfernt',
+    'toast.queue_already_empty':'Keine wartenden Aufträge zum Leeren vorhanden',
     'toast.queued_slots_locked':'eingereiht — Plätze gesperrt','toast.saved':'gespeichert',
     'toast.select_park_slot':'Bitte einen Park-Slot auswählen','toast.select_pick_slot':'Bitte einen Entnahme-Slot auswählen',
     'toast.select_printer':'Bitte einen Drucker auswählen','toast.slot_cleared':'Slot {n} geleert — blockierte Plätze freigegeben',
@@ -810,6 +819,10 @@ const I18N = {
     'toast.drop_file_first':'Veuillez d\'abord déposer un fichier .gcode/.3mf','toast.eject_sent':'Séquence d\'éjection envoyée',
     'toast.load_sent':'Macro de chargement envoyée','toast.name_brand_ip_required':'Nom, marque et IP requis',
     'toast.printer_removed':'Imprimante supprimée','toast.queue_stopped':'File arrêtée — emplacements libérés',
+    'jobs.clear_queue':'Vider la file',
+    'confirm.clear_queue':'Supprimer les {n} travail/travaux en attente de la file ? L\'historique (terminé/annulé/ignoré) est conservé.',
+    'toast.queue_cleared':'travail/travaux en attente supprimé(s) de la file',
+    'toast.queue_already_empty':'Aucun travail en attente à supprimer',
     'toast.queued_slots_locked':'mis en file — emplacements verrouillés','toast.saved':'enregistré',
     'toast.select_park_slot':'Veuillez sélectionner un emplacement de stationnement','toast.select_pick_slot':'Veuillez sélectionner un emplacement de prélèvement',
     'toast.select_printer':'Veuillez sélectionner une imprimante','toast.slot_cleared':'Emplacement {n} vidé — emplacements bloqués libérés',
@@ -902,6 +915,10 @@ const I18N = {
     'toast.drop_file_first':'Trascina prima un file .gcode/.3mf','toast.eject_sent':'Sequenza di espulsione inviata',
     'toast.load_sent':'Macro di caricamento inviata','toast.name_brand_ip_required':'Nome, marca e IP sono obbligatori',
     'toast.printer_removed':'Stampante rimossa','toast.queue_stopped':'Coda fermata — slot liberati',
+    'jobs.clear_queue':'Svuota coda',
+    'confirm.clear_queue':'Rimuovere i {n} lavori in attesa dalla coda? La cronologia (completati/annullati/saltati) viene mantenuta.',
+    'toast.queue_cleared':'lavori in attesa rimossi dalla coda',
+    'toast.queue_already_empty':'Nessun lavoro in attesa da rimuovere',
     'toast.queued_slots_locked':'in coda — slot bloccati','toast.saved':'salvato',
     'toast.select_park_slot':'Seleziona uno slot di parcheggio','toast.select_pick_slot':'Seleziona uno slot di prelievo',
     'toast.select_printer':'Seleziona una stampante','toast.slot_cleared':'Slot {n} svuotato — slot bloccati liberati',
@@ -994,6 +1011,10 @@ const I18N = {
     'toast.drop_file_first':'Por favor, suelta primero un archivo .gcode/.3mf','toast.eject_sent':'Secuencia de expulsión enviada',
     'toast.load_sent':'Macro de carga enviada','toast.name_brand_ip_required':'Nombre, marca e IP son obligatorios',
     'toast.printer_removed':'Impresora eliminada','toast.queue_stopped':'Cola detenida — ranuras liberadas',
+    'jobs.clear_queue':'Vaciar cola',
+    'confirm.clear_queue':'¿Eliminar los {n} trabajo(s) en espera de la cola? El historial (hecho/cancelado/omitido) se conserva.',
+    'toast.queue_cleared':'trabajo(s) en espera eliminados de la cola',
+    'toast.queue_already_empty':'No hay trabajos en espera para eliminar',
     'toast.queued_slots_locked':'en cola — ranuras bloqueadas','toast.saved':'guardado',
     'toast.select_park_slot':'Selecciona una ranura de estacionamiento','toast.select_pick_slot':'Selecciona una ranura de recogida',
     'toast.select_printer':'Selecciona una impresora','toast.slot_cleared':'Ranura {n} vaciada — ranuras bloqueadas liberadas',
@@ -1924,6 +1945,7 @@ const STEPS_NOPLATE=['upload','print','wait_finish','move','wait_idle','eject','
 
 function renderQueueUI(){
   document.getElementById('btn-q-start').style.display = queueState.state==='idle'?'':'none';
+  document.getElementById('btn-q-clear').style.display = queueState.state==='idle'?'':'none';
   document.getElementById('btn-q-pause').style.display = queueState.state==='running'?'':'none';
   document.getElementById('btn-q-resume').style.display = queueState.state==='paused'?'':'none';
   document.getElementById('btn-q-stop').style.display = queueState.state!=='idle'?'':'none';
@@ -2024,6 +2046,15 @@ async function queueResume(){
 async function queueStop(){
   const r=await api('POST','/api/queue/stop');
   if(r){queueState=r;await loadRackAndJobs();renderQueueUI();toast('info',t('toast.queue_stopped'));}
+}
+function confirmClearQueue(){
+  const waiting=jobsState.filter(j=>j.status==='queued').length;
+  if(!waiting){toast('info',t('toast.queue_already_empty'));return;}
+  if(confirm(t('confirm.clear_queue').replace('{n}', waiting)))clearQueue();
+}
+async function clearQueue(){
+  const r=await api('DELETE','/api/jobs');
+  if(r){await loadRackAndJobs();renderQueueUI();toast('ok',`${r.removed} ${t('toast.queue_cleared')}`);}
 }
 async function queueRetry(){
   const r=await api('POST','/api/queue/retry');
