@@ -321,6 +321,11 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
         <div data-i18n="jobs.file_types">.gcode, .3mf or .gcode.3mf</div>
         <div style="margin-top:3px;font-size:9px;opacity:.5" data-i18n="jobs.drop_hint">Drag &amp; drop or click — slots locked only when queued</div>
       </div>
+      <div class="field" style="margin-top:8px">
+        <select id="job-existing-file" onchange="selectExistingFile(this.value)">
+          <option value="" data-i18n="jobs.or_pick_existing">— or pick a stored file to reprint —</option>
+        </select>
+      </div>
       <div id="job-file-info" style="display:none;margin-bottom:10px"></div>
       <div id="job-file-err" style="display:none;color:var(--red);font-size:10px;margin-bottom:10px"></div>
 
@@ -643,6 +648,7 @@ const I18N = {
     'jobs.active_job':'Active Job','jobs.running':'Running','jobs.execution_steps':'Execution Steps',
     'jobs.new_job':'New Job','jobs.printer':'Printer','jobs.file_types':'.gcode, .3mf or .gcode.3mf',
     'jobs.drop_hint':'Drag & drop or click — slots locked only when queued',
+    'jobs.or_pick_existing':'— or pick a stored file to reprint —',
     'jobs.bed_type':'Bed Type','jobs.bed.textured':'Textured Plate','jobs.bed.cool':'Cool Plate',
     'jobs.bed.high_temp':'High Temp Plate','jobs.bed.engineering':'Engineering Plate',
     'jobs.use_ams':'Use AMS','jobs.bed_leveling':'Bed Leveling','jobs.flow_calibration':'Flow Calibration',
@@ -734,6 +740,7 @@ const I18N = {
     'jobs.active_job':'Aktiver Auftrag','jobs.running':'Läuft','jobs.execution_steps':'Ausführungsschritte',
     'jobs.new_job':'Neuer Auftrag','jobs.printer':'Drucker','jobs.file_types':'.gcode, .3mf oder .gcode.3mf',
     'jobs.drop_hint':'Ziehen & ablegen oder klicken — Plätze werden erst beim Einreihen gesperrt',
+    'jobs.or_pick_existing':'— oder gespeicherte Datei zum erneuten Drucken wählen —',
     'jobs.bed_type':'Bett-Typ','jobs.bed.textured':'Strukturplatte','jobs.bed.cool':'Cool Plate',
     'jobs.bed.high_temp':'Hochtemperatur-Platte','jobs.bed.engineering':'Engineering-Platte',
     'jobs.use_ams':'AMS verwenden','jobs.bed_leveling':'Bett-Nivellierung','jobs.flow_calibration':'Durchfluss-Kalibrierung',
@@ -825,6 +832,7 @@ const I18N = {
     'jobs.active_job':'Travail actif','jobs.running':'En cours','jobs.execution_steps':'Étapes d\'exécution',
     'jobs.new_job':'Nouveau travail','jobs.printer':'Imprimante','jobs.file_types':'.gcode, .3mf ou .gcode.3mf',
     'jobs.drop_hint':'Glisser-déposer ou cliquer — emplacements verrouillés seulement une fois mis en file',
+    'jobs.or_pick_existing':'— ou choisir un fichier enregistré à réimprimer —',
     'jobs.bed_type':'Type de plateau','jobs.bed.textured':'Plateau texturé','jobs.bed.cool':'Plateau froid',
     'jobs.bed.high_temp':'Plateau haute température','jobs.bed.engineering':'Plateau technique',
     'jobs.use_ams':'Utiliser l\'AMS','jobs.bed_leveling':'Mise à niveau du plateau','jobs.flow_calibration':'Calibration du débit',
@@ -916,6 +924,7 @@ const I18N = {
     'jobs.active_job':'Lavoro attivo','jobs.running':'In esecuzione','jobs.execution_steps':'Passaggi di esecuzione',
     'jobs.new_job':'Nuovo lavoro','jobs.printer':'Stampante','jobs.file_types':'.gcode, .3mf o .gcode.3mf',
     'jobs.drop_hint':'Trascina o clicca — gli slot si bloccano solo quando in coda',
+    'jobs.or_pick_existing':'— oppure scegli un file salvato da ristampare —',
     'jobs.bed_type':'Tipo di piano','jobs.bed.textured':'Piano testurizzato','jobs.bed.cool':'Piano freddo',
     'jobs.bed.high_temp':'Piano alta temperatura','jobs.bed.engineering':'Piano ingegneristico',
     'jobs.use_ams':'Usa AMS','jobs.bed_leveling':'Livellamento piano','jobs.flow_calibration':'Calibrazione flusso',
@@ -1007,6 +1016,7 @@ const I18N = {
     'jobs.active_job':'Trabajo activo','jobs.running':'En curso','jobs.execution_steps':'Pasos de ejecución',
     'jobs.new_job':'Nuevo trabajo','jobs.printer':'Impresora','jobs.file_types':'.gcode, .3mf o .gcode.3mf',
     'jobs.drop_hint':'Arrastra y suelta o haz clic — las ranuras se bloquean solo al poner en cola',
+    'jobs.or_pick_existing':'— o elige un archivo guardado para reimprimir —',
     'jobs.bed_type':'Tipo de cama','jobs.bed.textured':'Placa texturizada','jobs.bed.cool':'Placa fría',
     'jobs.bed.high_temp':'Placa alta temperatura','jobs.bed.engineering':'Placa de ingeniería',
     'jobs.use_ams':'Usar AMS','jobs.bed_leveling':'Nivelación de cama','jobs.flow_calibration':'Calibración de flujo',
@@ -1369,9 +1379,34 @@ async function loadFiles(){
       </div>`;
     ul.appendChild(li);
   }
+  const sel=document.getElementById('job-existing-file');
+  if(sel){
+    const cur=sel.value;
+    sel.innerHTML=`<option value="">${t('jobs.or_pick_existing')}</option>`+
+      files.map(f=>`<option value="${esc(f.name)}">${esc(f.name)} (${fmtSz(f.size)})</option>`).join('');
+    if(cur&&files.find(f=>f.name===cur))sel.value=cur;
+  }
 }
 
 async function delFile(name){await api('DELETE',`/api/files/${encodeURIComponent(name)}`);toast('ok',`${name} ${t('toast.deleted')}`);loadFiles();}
+
+async function selectExistingFile(name){
+  const errBox=document.getElementById('job-file-err');
+  const infoBox=document.getElementById('job-file-info');
+  errBox.style.display='none';infoBox.style.display='none';
+  lastAnalysis=null;
+  if(!name){updateJobSlotSelects();return;}
+  try{
+    const r=await fetch(`/api/analyze/${encodeURIComponent(name)}`);
+    const d=await r.json();
+    if(!r.ok){errBox.style.display='block';errBox.textContent=`⚠ ${d.detail||'Analysis failed'}`;updateJobSlotSelects();return;}
+    lastAnalysis=d;
+    renderJobFileInfo(d);
+  }catch(e){
+    errBox.style.display='block';errBox.textContent=`⚠ ${e.message}`;
+  }
+  updateJobSlotSelects();
+}
 
 // ── RACK SVG RENDERER ────────────────────────────────────────────────────────
 // Slot states: empty | ready | grab_reserved | park | printed
@@ -1603,6 +1638,7 @@ async function analyzeUpload(file){
   const infoBox=document.getElementById('job-file-info');
   errBox.style.display='none';infoBox.style.display='none';
   lastAnalysis=null;
+  const exSel=document.getElementById('job-existing-file'); if(exSel)exSel.value='';
   const fd=new FormData();fd.append('file',file);
   try{
     const r=await fetch('/api/analyze',{method:'POST',body:fd});
@@ -1619,8 +1655,13 @@ async function analyzeUpload(file){
 
 function renderJobFileInfo(r){
   const box=document.getElementById('job-file-info');
-  let html=`<div class="card" style="padding:8px 10px;font-size:10px;color:var(--muted)">
-    <div class="kv-row"><span class="kv-key">File</span><span style="color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">${esc(r.filename)}</span></div>
+  let html=`<div class="card" style="padding:8px 10px;font-size:10px;color:var(--muted)">`;
+  if(r.thumbnail){
+    html+=`<div style="display:flex;justify-content:center;margin-bottom:8px">
+      <img src="${r.thumbnail}" alt="" style="max-width:140px;max-height:140px;border-radius:3px;border:1px solid var(--brd2);background:var(--bg)">
+    </div>`;
+  }
+  html+=`<div class="kv-row"><span class="kv-key">File</span><span style="color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">${esc(r.filename)}</span></div>
     <div class="kv-row"><span class="kv-key">Height</span><span style="color:var(--txt)">${r.height_mm.toFixed(1)} mm</span></div>
     <div class="kv-row"><span class="kv-key">Slots needed</span><span style="color:${r.slots_needed>3?'var(--yel)':'var(--txt)'}">${r.slots_needed}</span></div>`;
 
@@ -1811,6 +1852,7 @@ async function addQueue(){
     toast('info',`${r.filename} ${t('toast.queued_slots_locked')}${r.slots_needed>1?` (+${r.slots_needed-1})`:''}`);
     lastAnalysis=null;
     document.getElementById('job-file-info').style.display='none';
+    const exSel=document.getElementById('job-existing-file'); if(exSel)exSel.value='';
     await loadRackAndJobs();
   }
 }
