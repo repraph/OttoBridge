@@ -40,7 +40,7 @@ BRANDS = {
     "bambu_lab": {
         "label": "Bambu Lab",
         "protocol": "mqtt_ftp",
-        "models": ["X1C", "X2D", "P1S", "P1P", "A1", "A1 Mini", "P2S"],
+        "models": ["X1C", "P1S", "P1P", "A1", "A1 Mini", "P2S"],
         "auth_fields": ["ip", "access_code", "serial"],
         "start_grace_s": 180,
     },
@@ -105,8 +105,6 @@ def _norm(s):
 _MACRO_MAP = {
     # Bambu Lab — X1C uses X_ONE_C from _printer_x1c.cfg
     ("bambu_lab", "x1c"):          ("EJECT_FROM_BAMBULAB_X_ONE_C",              "LOAD_ONTO_BAMBULAB_X_ONE_C",              True),
-    # X2D: X1C's direct successor, same X1-class enclosed body/gantry
-    ("bambu_lab", "x2d"):          ("EJECT_FROM_BAMBULAB_X_TWO_D",              "LOAD_ONTO_BAMBULAB_X_TWO_D",              True),
     ("bambu_lab", "p1s"):          ("EJECT_FROM_BAMBULAB_P_ONE_S",              "LOAD_ONTO_BAMBULAB_P_ONE_S",              True),
     ("bambu_lab", "p1p"):          ("EJECT_FROM_BAMBULAB_P_ONE_P",              "LOAD_ONTO_BAMBULAB_P_ONE_P",              False),
     ("bambu_lab", "a1"):           ("EJECT_FROM_BAMBULAB_A_ONE",                "LOAD_ONTO_BAMBULAB_A_ONE",                False),
@@ -152,7 +150,6 @@ def get_close_door_macro(brand, model):
     m = _norm(model)
     b = _norm(brand)
     if "x1c" in m or "xonec" in m:       return "CLOSE_DOOR_BAMBULAB_X_ONE_C"
-    if "x2d" in m or "xtwod" in m:       return "CLOSE_DOOR_BAMBULAB_X_TWO_D"
     if "p1s" in m or "p2s" in m:         return "CLOSE_DOOR_BAMBULAB_P_ONE_S"
     if "kobra" in m:                      return "CLOSE_DOOR_ANYCUBIC_KOBRA_S_ONE"
     if "centauri" in m or "carbon" in m:  return "CLOSE_DOOR_ELEGOO_CC"
@@ -472,20 +469,13 @@ async def moonraker_poll_loop(pid: str):
 async def prusa_poll_loop(pid: str):
     p = printers.get(pid)
     if not p: return
-    base = f"http://{p.ip}"
-    # PrusaLink's /api/v1/* endpoints require HTTP Digest auth (username
-    # "maker", password = the API key) per the official OpenAPI spec — NOT a
-    # plain X-Api-Key header. X-Api-Key only works on the legacy /api/job,
-    # /api/printer, /api/version endpoints, not /api/v1/*. This matches
-    # widely-reported "HTTP 403: Bad X-Api-Key" errors on real Buddy-firmware
-    # printers (MK4/MK3.9/Core One/MINI/XL) whose fix was switching to digest.
-    auth = httpx.DigestAuth("maker", p.api_key)
+    base = f"http://{p.ip}"; headers = {"X-Api-Key": p.api_key}
     log.info(f"[{p.name}] PrusaLink poll {base}")
-    _SM = {"IDLE":"IDLE","PRINTING":"RUNNING","PAUSED":"PAUSED","FINISHED":"FINISH","ERROR":"FAILED","ATTENTION":"PAUSED","STOPPED":"STOPPED"}
+    _SM = {"IDLE":"IDLE","PRINTING":"RUNNING","PAUSED":"PAUSED","FINISHED":"FINISH","ERROR":"FAILED","ATTENTION":"PAUSED"}
     while printers.get(pid):
         try:
             async with httpx.AsyncClient(timeout=8) as c:
-                r = await c.get(f"{base}/api/v1/status", auth=auth)
+                r = await c.get(f"{base}/api/v1/status", headers=headers)
             if r.status_code == 200:
                 d = r.json(); job = d.get("job", {}); prn = d.get("printer", {})
                 p.status        = _SM.get(prn.get("state", ""), "UNKNOWN")
@@ -770,8 +760,7 @@ async def prusa_upload(pid, local_path, remote_name):
         async with httpx.AsyncClient(timeout=60) as c:
             with open(local_path, "rb") as f:
                 r = await c.put(f"http://{p.ip}/api/v1/files/usb/{remote_name}",
-                    content=f.read(), auth=httpx.DigestAuth("maker", p.api_key),
-                    headers={"Content-Type":"application/octet-stream"})
+                    content=f.read(), headers={"X-Api-Key": p.api_key, "Content-Type":"application/octet-stream"})
         return r.status_code in (200, 201, 204, 409)
     except Exception as e: log.error(f"FTP prusa: {e}"); return False
 
@@ -1047,7 +1036,7 @@ async def test_printer_connection(cfg: TestConnCfg):
             return {"ok": True, "message": "FTP login successful"}
         elif proto == "prusalink":
             async with httpx.AsyncClient(timeout=8) as c:
-                r = await c.get(f"http://{cfg.ip}/api/v1/status", auth=httpx.DigestAuth("maker", api_key))
+                r = await c.get(f"http://{cfg.ip}/api/v1/status", headers={"X-Api-Key": api_key})
             return {"ok": r.status_code == 200, "message": f"HTTP {r.status_code}" if r.status_code != 200 else "PrusaLink reachable"}
         elif proto == "moonraker":
             async with httpx.AsyncClient(timeout=8) as c:
@@ -1254,7 +1243,7 @@ async def start_print(req: StartPrint):
         try:
             async with httpx.AsyncClient(timeout=10) as c:
                 r = await c.post(f"http://{p.ip}/api/v1/print",
-                    auth=httpx.DigestAuth("maker", p.api_key), json={"path":f"/usb/{req.filename}"})
+                    headers={"X-Api-Key":p.api_key}, json={"path":f"/usb/{req.filename}"})
             ok = r.status_code in (200,201,204)
         except Exception as e: raise HTTPException(503, str(e))
     elif p.protocol in ("moonraker","websocket"):
@@ -1290,7 +1279,7 @@ async def _ctrl(pid, cmd):
         cm = {"pause":"PAUSE","resume":"RESUME","stop":"CANCEL"}.get(cmd, cmd.upper())
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.put(f"http://{p.ip}/api/v1/job",
-                auth=httpx.DigestAuth("maker", p.api_key), json={"command":cm})
+                headers={"X-Api-Key":p.api_key}, json={"command":cm})
         return r.status_code in (200,204)
     elif p.protocol in ("moonraker","websocket"):
         gc = {"pause":"PAUSE","resume":"RESUME","stop":"CANCEL_PRINT"}.get(cmd, cmd.upper())
@@ -2023,7 +2012,7 @@ async def _run_klipper(macro: str):
     except Exception as e: raise HTTPException(503, f"Moonraker: {e}")
 
 COREXY_MODELS = {
-    "X1C","X2D","P1S","P1P","A1","A1 Mini","P2S",   # Bambu Lab
+    "X1C","P1S","P1P","A1","A1 Mini","P2S",   # Bambu Lab
     "Core One",                                  # Prusa Core One
     "K1C","K1","K1 Max",                         # Creality
     "Kobra S1",                                  # Anycubic
