@@ -117,7 +117,7 @@ _MACRO_MAP = {
     ("prusa", "mk3"):              ("EJECT_FROM_PRUSA_MK_THREE",                "LOAD_ONTO_PRUSA_MK_THREE",                False),
     ("prusa", "mk4s"):             ("EJECT_FROM_PRUSA_MK_FOUR_S",               "LOAD_ONTO_PRUSA_MK_FOUR_S",               False),
     ("prusa", "mk4"):              ("EJECT_FROM_PRUSA_MK_FOUR",                 "LOAD_ONTO_PRUSA_MK_FOUR",                 False),
-    ("prusa", "coreone"):          ("EJECT_FROM_PRUSA_CORE_ONE",                "LOAD_ONTO_PRUSA_CORE_ONE",                False),
+    ("prusa", "coreone"):          ("EJECT_FROM_PRUSA_CORE_ONE",                "LOAD_ONTO_PRUSA_CORE_ONE",                True),
     # Anycubic
     ("anycubic", "kobras1"):       ("EJECT_FROM_ANYCUBIC_KOBRA_S_ONE",          "LOAD_ONTO_ANYCUBIC_KOBRA_S_ONE",          True),
     # Elegoo
