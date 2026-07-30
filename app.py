@@ -769,7 +769,7 @@ async def prusa_upload(pid, local_path, remote_name):
     try:
         async with httpx.AsyncClient(timeout=60) as c:
             with open(local_path, "rb") as f:
-                r = await c.put(f"http://{p.ip}/api/v1/files/usb/{remote_name}",
+                r = await c.put(f"http://{p.ip}/api/v1/files/local/{remote_name}",
                     content=f.read(), auth=httpx.DigestAuth("maker", p.api_key),
                     headers={"Content-Type":"application/octet-stream"})
         return r.status_code in (200, 201, 204, 409)
@@ -817,7 +817,7 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
         try:
             async with httpx.AsyncClient(timeout=60) as c:
                 with open(tmp_path, "rb") as f:
-                    r_put = await c.put(f"http://{p.ip}/api/v1/files/usb/{remote_name}",
+                    r_put = await c.put(f"http://{p.ip}/api/v1/files/local/{remote_name}",
                         content=f.read(), auth=httpx.DigestAuth("maker", p.api_key),
                         headers={"Content-Type": "application/octet-stream"})
         except Exception as e:
@@ -837,7 +837,7 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
             await asyncio.sleep(delay)
             async with httpx.AsyncClient(timeout=10) as c:
                 r = await c.post(f"http://{p.ip}/api/v1/print",
-                    auth=httpx.DigestAuth("maker", p.api_key), json={"path": f"/usb/{remote_name}"})
+                    auth=httpx.DigestAuth("maker", p.api_key), json={"path": f"/local/{remote_name}"})
             if r.status_code in (200, 201, 204):
                 break
             log.debug(f"[{p.name}] utility move: print-start attempt {attempt+1} got HTTP {r.status_code}, retrying…")
@@ -878,7 +878,7 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
         # Best-effort cleanup — don't fail the whole operation if this doesn't work.
         try:
             async with httpx.AsyncClient(timeout=10) as c:
-                await c.delete(f"http://{p.ip}/api/v1/files/usb/{remote_name}",
+                await c.delete(f"http://{p.ip}/api/v1/files/local/{remote_name}",
                     auth=httpx.DigestAuth("maker", p.api_key))
         except Exception as e:
             log.debug(f"[{p.name}] utility move: cleanup delete failed (harmless): {e}")
@@ -1597,7 +1597,7 @@ async def start_print(req: StartPrint):
                 await asyncio.sleep(delay)
                 async with httpx.AsyncClient(timeout=10) as c:
                     r = await c.post(f"http://{p.ip}/api/v1/print",
-                        auth=httpx.DigestAuth("maker", p.api_key), json={"path":f"/usb/{req.filename}"})
+                        auth=httpx.DigestAuth("maker", p.api_key), json={"path":f"/local/{req.filename}"})
                 if r.status_code in (200, 201, 204):
                     break
                 log.debug(f"[{p.name}] print-start attempt {attempt+1} got HTTP {r.status_code}, retrying…")
