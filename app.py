@@ -802,7 +802,25 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
         log.error(f"[{p.name}] utility move refused — printer not idle (status={p.status})")
         return False
 
-    gcode_text = "\n".join(gcode_lines) + "\nM84\n"
+    # Buddy firmware (Core One, MK4/S, MK3.9/S, MK3.5/S, XL, MINI) refuses to
+    # auto-run a gcode file that doesn't declare its compatibility via M862.x
+    # checks, showing "The G-code isn't fully compatible" and waiting for a
+    # human to press PRINT on the LCD/Connect instead of running it —
+    # confirmed directly (Prusa's own knowledge-base article #31803 covers
+    # this exact message for Core One and every current Buddy-firmware
+    # model). PrusaSlicer normally embeds these automatically; since we're
+    # hand-writing this utility file, we add them ourselves.
+    # NOTE: nozzle diameter isn't tracked per-printer in OttoBridge, so this
+    # assumes the overwhelmingly common 0.4mm nozzle — if a printer actually
+    # has a different nozzle installed, this same warning will reappear.
+    model_check = {
+        "Core One": "COREONE", "MK4S": "MK4S", "MK4": "MK4",
+        "MK3S": "MK3S", "MK3": "MK3",
+    }.get(p.model)
+    compat_header = "M862.1 P0.4 A0 F0 ; nozzle check\nM862.5 P2 ; g-code level check\n"
+    if model_check:
+        compat_header += f'M862.3 P "{model_check}" ; printer model check\n'
+    gcode_text = compat_header + "\n".join(gcode_lines) + "\nM84\n"
     # A unique filename every call — PrusaLink's file PUT returns 409 Conflict
     # (not a harmless "already exists, treated as overwrite") when the target
     # name is already taken, which silently broke the very first version of
