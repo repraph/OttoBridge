@@ -808,16 +808,25 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
     # human to press PRINT on the LCD/Connect instead of running it —
     # confirmed directly (Prusa's own knowledge-base article #31803 covers
     # this exact message for Core One and every current Buddy-firmware
-    # model). PrusaSlicer normally embeds these automatically; since we're
+    # model, AND confirmed reproducing even when starting the file directly
+    # from the printer's own LCD, ruling out anything upload-side).
+    # PrusaSlicer normally embeds these automatically; since we're
     # hand-writing this utility file, we add them ourselves.
-    # NOTE: nozzle diameter isn't tracked per-printer in OttoBridge, so this
-    # assumes the overwhelmingly common 0.4mm nozzle — if a printer actually
-    # has a different nozzle installed, this same warning will reappear.
+    # F1 (not F0) below is not a generic default — it's taken directly from
+    # this printer's own real slicer profile (nozzle_high_flow=1, HF0.4
+    # nozzle variant), extracted from the .bgcode file the person uploaded
+    # earlier. The very first version of this fix used F0 and still failed
+    # with the exact same warning even printed directly from the LCD —
+    # a nozzle high-flow MISMATCH is a documented cause of this exact
+    # message on the Prusa forums, and F0 was wrong for this printer.
+    # NOTE: nozzle diameter (0.4mm) is still an assumed default — OttoBridge
+    # doesn't track that per-printer, so a printer with a different nozzle
+    # installed could still hit this warning.
     model_check = {
         "Core One": "COREONE", "MK4S": "MK4S", "MK4": "MK4",
         "MK3S": "MK3S", "MK3": "MK3",
     }.get(p.model)
-    compat_header = "M862.1 P0.4 A0 F0 ; nozzle check\nM862.5 P2 ; g-code level check\n"
+    compat_header = "M862.1 P0.4 A0 F1 ; nozzle check\nM862.5 P2 ; g-code level check\n"
     if model_check:
         compat_header += f'M862.3 P "{model_check}" ; printer model check\n'
     gcode_text = compat_header + "\n".join(gcode_lines) + "\nM84\n"
