@@ -1265,19 +1265,25 @@ _BG_HEIGHT_KEY_RE = re.compile(r'(?:"max_z"|max_layer_z|max_z_height)\s*[:=]\s*"
 
 def _analyze_bgcode(data: bytes) -> dict:
     """Best-effort height + thumbnail extraction for PrusaSlicer .bgcode files.
-    Height: scanned from Print/Slicer metadata blocks (INI/JSON text,
-    Deflate-compressed — decodable with the standard library) rather than
-    the main GCode block, which by default uses Heatshrink+MeatPack that we
-    deliberately don't decode (see _bgcode_blocks docstring). If a file was
-    exported with GCode compression disabled, we also scan that block
-    directly as a bonus. Returns {"height_mm":..., "thumbnail":...}; either
-    may be None if not found."""
+    Height: scanned from the metadata blocks (INI-style text, either
+    uncompressed or Deflate-compressed — both decodable with the standard
+    library) rather than the main GCode block, which by default uses
+    Heatshrink+MeatPack that we deliberately don't decode (see
+    _bgcode_blocks docstring). Confirmed against a real PrusaSlicer 2.9.6
+    Core One .bgcode file: PrusaSlicer writes "max_layer_z=24.00" into the
+    PRINTER metadata block (type 3, uncompressed) — not Print or Slicer
+    metadata as might be assumed — so all four metadata block types are
+    scanned. If a file was exported with GCode compression disabled, that
+    block is also scanned directly as a bonus. Returns
+    {"height_mm":..., "thumbnail":...}; either may be None if not found."""
     height = None
     thumbnail = None
+    best_thumb_area = 0
     for block_type, params, payload in _bgcode_blocks(data):
         if payload is None:
             continue
-        if block_type in (_BG_BLOCK_PRINT_METADATA, _BG_BLOCK_SLICER_METADATA) and height is None:
+        if block_type in (_BG_BLOCK_PRINT_METADATA, _BG_BLOCK_SLICER_METADATA,
+                          _BG_BLOCK_PRINTER_METADATA, _BG_BLOCK_FILE_METADATA) and height is None:
             text = payload.decode("utf-8", errors="ignore")
             m = _BG_HEIGHT_KEY_RE.search(text)
             if m:
@@ -1286,16 +1292,28 @@ def _analyze_bgcode(data: bytes) -> dict:
             # Only reachable when Compression=0 (payload wouldn't be set
             # otherwise) — plain text, safe to scan with the normal method.
             height = _scan_height(payload)
-        elif block_type == _BG_BLOCK_THUMBNAIL and thumbnail is None:
+        elif block_type == _BG_BLOCK_THUMBNAIL:
+            # A .bgcode file typically embeds several thumbnails at different
+            # sizes (e.g. a tiny 16x16 icon plus a large preview) — pick the
+            # largest by pixel area instead of just the first one found, so
+            # the UI shows a genuinely useful preview rather than an icon.
+            area = params.get("width", 0) * params.get("height", 0)
+            if area <= best_thumb_area:
+                continue
             fmt = params.get("format")
             try:
                 if fmt == 2:  # QOI
                     w, h, rgba = _qoi_decode(payload)
-                    thumbnail = "data:image/png;base64," + base64.b64encode(_rgba_to_png(w, h, rgba)).decode()
+                    candidate = "data:image/png;base64," + base64.b64encode(_rgba_to_png(w, h, rgba)).decode()
                 elif fmt == 0:  # PNG
-                    thumbnail = "data:image/png;base64," + base64.b64encode(payload).decode()
+                    candidate = "data:image/png;base64," + base64.b64encode(payload).decode()
                 elif fmt == 1:  # JPG
-                    thumbnail = "data:image/jpeg;base64," + base64.b64encode(payload).decode()
+                    candidate = "data:image/jpeg;base64," + base64.b64encode(payload).decode()
+                else:
+                    candidate = None
+                if candidate:
+                    thumbnail = candidate
+                    best_thumb_area = area
             except Exception as e:
                 log.debug(f"bgcode thumbnail decode: {e}")
     return {"height_mm": height, "thumbnail": thumbnail}
@@ -1339,7 +1357,11 @@ def analyze_print_file(filename: str, data: bytes) -> dict:
     lower = filename.lower()
 
     if lower.endswith(".bgcode"):
-        bg = _analyze_bgcode(data)
+        try:
+            bg = _analyze_bgcode(data)
+        except Exception as e:
+            log.error(f"bgcode parse failed for '{filename}': {e}")
+            bg = {"height_mm": None, "thumbnail": None}
         height = bg["height_mm"]
         slots_needed = max(1, -(-int(height) // SLOT_GAP_MM)) if height else None
         return {
