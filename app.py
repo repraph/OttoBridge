@@ -827,9 +827,20 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
             log.error(f"[{p.name}] utility move: upload rejected (HTTP {r_put.status_code})")
             return False
 
-        async with httpx.AsyncClient(timeout=10) as c:
-            r = await c.post(f"http://{p.ip}/api/v1/print",
-                auth=httpx.DigestAuth("maker", p.api_key), json={"path": f"/usb/{remote_name}"})
+        # PrusaLink's file listing can lag a moment behind a successful PUT
+        # (confirmed directly: PUT returned 201 Created, but an immediate
+        # print-start 404'd because the printer's internal index hadn't
+        # caught up yet) — same class of filesystem-settle race we already
+        # hit with Bambu's FTP. Wait briefly, then retry once before giving up.
+        r = None
+        for attempt, delay in enumerate((2, 3)):
+            await asyncio.sleep(delay)
+            async with httpx.AsyncClient(timeout=10) as c:
+                r = await c.post(f"http://{p.ip}/api/v1/print",
+                    auth=httpx.DigestAuth("maker", p.api_key), json={"path": f"/usb/{remote_name}"})
+            if r.status_code in (200, 201, 204):
+                break
+            log.debug(f"[{p.name}] utility move: print-start attempt {attempt+1} got HTTP {r.status_code}, retrying…")
         if r.status_code not in (200, 201, 204):
             log.error(f"[{p.name}] utility move: start failed (HTTP {r.status_code})")
             return False
@@ -1575,10 +1586,21 @@ async def start_print(req: StartPrint):
     elif p.protocol == "prusalink":
         # Prusa: MMU3 tool changes are embedded in the gcode by the slicer.
         # PrusaLink does not accept filament mapping parameters — the gcode handles it.
+        # PrusaLink's file listing can lag a moment behind a completed upload
+        # (confirmed directly via _prusa_utility_move: a successful 201
+        # Created PUT was followed by an immediate 404 on print-start) —
+        # same filesystem-settle race we hit with Bambu's FTP. Retry once
+        # after a short wait before giving up.
         try:
-            async with httpx.AsyncClient(timeout=10) as c:
-                r = await c.post(f"http://{p.ip}/api/v1/print",
-                    auth=httpx.DigestAuth("maker", p.api_key), json={"path":f"/usb/{req.filename}"})
+            r = None
+            for attempt, delay in enumerate((2, 3)):
+                await asyncio.sleep(delay)
+                async with httpx.AsyncClient(timeout=10) as c:
+                    r = await c.post(f"http://{p.ip}/api/v1/print",
+                        auth=httpx.DigestAuth("maker", p.api_key), json={"path":f"/usb/{req.filename}"})
+                if r.status_code in (200, 201, 204):
+                    break
+                log.debug(f"[{p.name}] print-start attempt {attempt+1} got HTTP {r.status_code}, retrying…")
             ok = r.status_code in (200,201,204)
         except Exception as e: raise HTTPException(503, str(e))
     elif p.protocol in ("moonraker","websocket"):
