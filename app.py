@@ -769,7 +769,7 @@ async def prusa_upload(pid, local_path, remote_name):
     try:
         async with httpx.AsyncClient(timeout=60) as c:
             with open(local_path, "rb") as f:
-                r = await c.put(f"http://{p.ip}/api/v1/files/local/{remote_name}",
+                r = await c.put(f"http://{p.ip}/api/v1/files/usb/{remote_name}",
                     content=f.read(), auth=httpx.DigestAuth("maker", p.api_key),
                     headers={"Content-Type":"application/octet-stream"})
         return r.status_code in (200, 201, 204, 409)
@@ -817,7 +817,7 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
         try:
             async with httpx.AsyncClient(timeout=60) as c:
                 with open(tmp_path, "rb") as f:
-                    r_put = await c.put(f"http://{p.ip}/api/v1/files/local/{remote_name}",
+                    r_put = await c.put(f"http://{p.ip}/api/v1/files/usb/{remote_name}",
                         content=f.read(), auth=httpx.DigestAuth("maker", p.api_key),
                         headers={"Content-Type": "application/octet-stream"})
         except Exception as e:
@@ -827,17 +827,18 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
             log.error(f"[{p.name}] utility move: upload rejected (HTTP {r_put.status_code})")
             return False
 
-        # PrusaLink's file listing can lag a moment behind a successful PUT
-        # (confirmed directly: PUT returned 201 Created, but an immediate
-        # print-start 404'd because the printer's internal index hadn't
-        # caught up yet) — same class of filesystem-settle race we already
-        # hit with Bambu's FTP. Wait briefly, then retry once before giving up.
+        # Start the print: per the official PrusaLink OpenAPI spec, this is a
+        # bare POST to the SAME URL used to upload the file (not a separate
+        # "/api/v1/print" endpoint with a JSON body — that endpoint doesn't
+        # exist at all, which is the actual reason this kept 404ing). Body is
+        # ignored by the server. A short retry is kept as defense against
+        # genuine transient network hiccups, not because of any known race.
         r = None
-        for attempt, delay in enumerate((2, 3)):
-            await asyncio.sleep(delay)
+        for attempt, delay in enumerate((0, 3)):
+            if delay: await asyncio.sleep(delay)
             async with httpx.AsyncClient(timeout=10) as c:
-                r = await c.post(f"http://{p.ip}/api/v1/print",
-                    auth=httpx.DigestAuth("maker", p.api_key), json={"path": f"/local/{remote_name}"})
+                r = await c.post(f"http://{p.ip}/api/v1/files/usb/{remote_name}",
+                    auth=httpx.DigestAuth("maker", p.api_key))
             if r.status_code in (200, 201, 204):
                 break
             log.debug(f"[{p.name}] utility move: print-start attempt {attempt+1} got HTTP {r.status_code}, retrying…")
@@ -878,7 +879,7 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
         # Best-effort cleanup — don't fail the whole operation if this doesn't work.
         try:
             async with httpx.AsyncClient(timeout=10) as c:
-                await c.delete(f"http://{p.ip}/api/v1/files/local/{remote_name}",
+                await c.delete(f"http://{p.ip}/api/v1/files/usb/{remote_name}",
                     auth=httpx.DigestAuth("maker", p.api_key))
         except Exception as e:
             log.debug(f"[{p.name}] utility move: cleanup delete failed (harmless): {e}")
@@ -1586,18 +1587,19 @@ async def start_print(req: StartPrint):
     elif p.protocol == "prusalink":
         # Prusa: MMU3 tool changes are embedded in the gcode by the slicer.
         # PrusaLink does not accept filament mapping parameters — the gcode handles it.
-        # PrusaLink's file listing can lag a moment behind a completed upload
-        # (confirmed directly via _prusa_utility_move: a successful 201
-        # Created PUT was followed by an immediate 404 on print-start) —
-        # same filesystem-settle race we hit with Bambu's FTP. Retry once
-        # after a short wait before giving up.
+        # Start the print: per the official PrusaLink OpenAPI spec, this is a
+        # bare POST to the SAME URL used to upload the file (not a separate
+        # "/api/v1/print" endpoint with a JSON body — that endpoint doesn't
+        # exist at all, which is the actual reason this kept 404ing). Body is
+        # ignored by the server. A short retry is kept as defense against
+        # genuine transient network hiccups, not because of any known race.
         try:
             r = None
-            for attempt, delay in enumerate((2, 3)):
-                await asyncio.sleep(delay)
+            for attempt, delay in enumerate((0, 3)):
+                if delay: await asyncio.sleep(delay)
                 async with httpx.AsyncClient(timeout=10) as c:
-                    r = await c.post(f"http://{p.ip}/api/v1/print",
-                        auth=httpx.DigestAuth("maker", p.api_key), json={"path":f"/local/{req.filename}"})
+                    r = await c.post(f"http://{p.ip}/api/v1/files/usb/{req.filename}",
+                        auth=httpx.DigestAuth("maker", p.api_key))
                 if r.status_code in (200, 201, 204):
                     break
                 log.debug(f"[{p.name}] print-start attempt {attempt+1} got HTTP {r.status_code}, retrying…")
@@ -1633,11 +1635,35 @@ async def _ctrl(pid, cmd):
     if p.protocol == "mqtt_ftp":
         return await bambu_publish(pid, {"print":{"command":cmd,"param":"","sequence_id":_seq()}})
     elif p.protocol == "prusalink":
-        cm = {"pause":"PAUSE","resume":"RESUME","stop":"CANCEL"}.get(cmd, cmd.upper())
-        async with httpx.AsyncClient(timeout=10) as c:
-            r = await c.put(f"http://{p.ip}/api/v1/job",
-                auth=httpx.DigestAuth("maker", p.api_key), json={"command":cm})
-        return r.status_code in (200,204)
+        # Per the official PrusaLink OpenAPI spec, job control needs the
+        # current job's numeric id — there is no generic "PUT /api/v1/job
+        # {command: ...}" endpoint (that was never a real endpoint, same
+        # class of mistake as the print-start bug). Each action is its own
+        # path/method: DELETE /api/v1/job/{id} to stop, PUT .../pause,
+        # PUT .../resume.
+        try:
+            async with httpx.AsyncClient(timeout=10) as c:
+                r_job = await c.get(f"http://{p.ip}/api/v1/job", auth=httpx.DigestAuth("maker", p.api_key))
+            if r_job.status_code != 200:
+                log.error(f"[{p.name}] {cmd}: no active job (HTTP {r_job.status_code})")
+                return False
+            job_id = r_job.json().get("id")
+            if job_id is None:
+                log.error(f"[{p.name}] {cmd}: job response had no id")
+                return False
+            method, path = {
+                "pause":  ("PUT", f"/api/v1/job/{job_id}/pause"),
+                "resume": ("PUT", f"/api/v1/job/{job_id}/resume"),
+                "stop":   ("DELETE", f"/api/v1/job/{job_id}"),
+            }.get(cmd, (None, None))
+            if not method:
+                return False
+            async with httpx.AsyncClient(timeout=10) as c:
+                r = await c.request(method, f"http://{p.ip}{path}", auth=httpx.DigestAuth("maker", p.api_key))
+            return r.status_code in (200, 204)
+        except Exception as e:
+            log.error(f"[{p.name}] {cmd} failed: {e}")
+            return False
     elif p.protocol in ("moonraker","websocket"):
         gc = {"pause":"PAUSE","resume":"RESUME","stop":"CANCEL_PRINT"}.get(cmd, cmd.upper())
         return await moonraker_gcode(pid, gc)
