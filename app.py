@@ -775,6 +775,86 @@ async def prusa_upload(pid, local_path, remote_name):
         return r.status_code in (200, 201, 204, 409)
     except Exception as e: log.error(f"FTP prusa: {e}"); return False
 
+async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float = 60.0) -> bool:
+    """Home/move a PrusaLink printer without a raw-gcode API by uploading a
+    tiny, non-extruding gcode file and running it through PrusaLink's normal
+    upload-and-print mechanism — PrusaLink has no endpoint for sending
+    arbitrary gcode at all (confirmed: prusa3d/Prusa-Link issue #832,
+    "Direct G-Code entry for PrusaLink", still open/unimplemented; widely
+    reported by users). This exact upload-a-tiny-"print"-to-move trick is a
+    known community workaround for the same limitation on other printers
+    with no console access.
+
+    Deliberately conservative, to avoid ever interfering with a real print:
+    - Refuses to run unless the printer is currently idle. Never starts this
+      over an active/paused print — that would cancel the person's actual job.
+    - Bounded wait for the utility "print" to finish (no indefinite hang).
+    - After it finishes, explicitly waits for the printer to settle back to
+      an idle/startable state before reporting success. PrusaLink can leave
+      a completed job needing to "clear" before a new one may start — if we
+      returned success too early, the REAL print that follows could fail to
+      start for a reason that would look identical to the bug this whole
+      mechanism exists to fix. Reports failure clearly instead of guessing."""
+    p = printers.get(pid)
+    if not p or p.protocol != "prusalink":
+        return False
+    if p.status not in ("IDLE", "READY", "", "UNKNOWN"):
+        log.error(f"[{p.name}] utility move refused — printer not idle (status={p.status})")
+        return False
+
+    gcode_text = "\n".join(gcode_lines) + "\nM84\n"
+    remote_name = "_ottobridge_move.gcode"
+    tmp_path = UPLOAD_DIR / f"_ottobridge_move_{pid}.gcode"
+    try:
+        await asyncio.get_event_loop().run_in_executor(None, tmp_path.write_text, gcode_text)
+        if not await prusa_upload(pid, str(tmp_path), remote_name):
+            log.error(f"[{p.name}] utility move: upload failed")
+            return False
+
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.post(f"http://{p.ip}/api/v1/print",
+                auth=httpx.DigestAuth("maker", p.api_key), json={"path": f"/usb/{remote_name}"})
+        if r.status_code not in (200, 201, 204):
+            log.error(f"[{p.name}] utility move: start failed (HTTP {r.status_code})")
+            return False
+
+        # Wait for it to actually go RUNNING and then leave that state again.
+        # A pure home+move with no extrusion normally takes just a few seconds.
+        deadline = time.time() + timeout_s
+        seen_running = False
+        while time.time() < deadline:
+            await asyncio.sleep(1)
+            cur = printers.get(pid)
+            if not cur: return False
+            if cur.status == "RUNNING":
+                seen_running = True
+            elif seen_running:
+                break
+        else:
+            log.error(f"[{p.name}] utility move: timed out waiting for it to finish")
+            return False
+
+        # Settle check: confirm the printer is genuinely ready for what comes
+        # next (either the real print, or another queue step) before we
+        # claim success.
+        settle_deadline = time.time() + 15
+        while time.time() < settle_deadline:
+            cur = printers.get(pid)
+            if cur and cur.status in ("IDLE", "READY"):
+                return True
+            await asyncio.sleep(1)
+        cur = printers.get(pid)
+        log.error(f"[{p.name}] utility move: printer did not settle back to idle afterward (status={cur.status if cur else '?'})")
+        return False
+    except Exception as e:
+        log.error(f"[{p.name}] utility move failed: {e}")
+        return False
+    finally:
+        try:
+            await aiofiles.os.remove(tmp_path)
+        except Exception:
+            pass
+
 async def moonraker_upload(pid, local_path, remote_name):
     p = printers.get(pid)
     if not p: return False
@@ -1849,7 +1929,13 @@ class QueueManager:
             r = await _run_klipper("OTTOEJECT_HOME")
             if not r.get("ok"): return False
             pid = job["printer_id"]
-            ok = await _send_printer_gcode(pid, "G28")
+            p = printers.get(pid)
+            if p and p.protocol == "prusalink":
+                # PrusaLink has no raw-gcode API — route through the tiny-utility-print
+                # mechanism instead (see _prusa_utility_move docstring).
+                ok = await _prusa_utility_move(pid, ["G28"])
+            else:
+                ok = await _send_printer_gcode(pid, "G28")
             return ok
         except Exception as e:
             log.error(f"Queue-start homing failed: {e}")
@@ -1955,6 +2041,10 @@ class QueueManager:
             move_cmd = "G1 Z200 F3000"
         else:
             move_cmd = f"G1 Y{CARTESIAN_YMAX.get(p.model, 210)} F6000"
+        if p.protocol == "prusalink":
+            # PrusaLink has no raw-gcode API — route through the tiny-utility-print
+            # mechanism instead (see _prusa_utility_move docstring).
+            return await _prusa_utility_move(pid, [move_cmd, "M400"])
         await _send_printer_gcode(pid, move_cmd)
         await _send_printer_gcode(pid, "M400")
         return True
@@ -2283,14 +2373,37 @@ COREXY_MODELS = {
 CARTESIAN_YMAX = {"MK3S":210,"MK3":210,"MK4S":250,"MK4":250}
 
 async def _send_printer_gcode(pid: str, cmd: str) -> bool:
-    """Send a gcode command to the printer itself (not Klipper/Moonraker)."""
+    """Send a gcode command to the printer itself (not Klipper/Moonraker).
+    Only some protocols actually support this:
+    - mqtt_ftp (Bambu): real feature via MQTT gcode_line.
+    - moonraker/websocket (Creality, Anycubic+Rinkhals, generic Klipper):
+      these ARE genuine Klipper/Moonraker printers, so moonraker_gcode is
+      correct and real.
+    - prusalink (Prusa): PrusaLink has NO raw-gcode endpoint at all — this
+      is confirmed by Prusa's own tracker (prusa3d/Prusa-Link issue #832,
+      "Direct G-Code entry for PrusaLink", still open/unimplemented) and
+      widely reported by users. We used to silently route this to
+      moonraker_gcode() anyway, which tried to reach a Moonraker instance
+      that was never running on a Prusa printer — causing homing/move
+      steps to fail outright. Sending G28/Z-moves isn't actually needed for
+      Prusa anyway: PrusaSlicer's own end_gcode already raises Z and parks
+      XY at a safe position after every print (visible directly in this
+      project's own uploaded slicer profile), so we just no-op (report
+      success) instead of guessing at a nonexistent API.
+    - sdcp_ws (Elegoo): the official SDCP spec has no raw-gcode command
+      either (only Start/Pause/Stop/Resume) — same no-op reasoning.
+    - http_tcp (FlashForge): its own proprietary HTTP/JSON control
+      protocol, not Klipper — also not moonraker_gcode's job, same no-op."""
     p = printers.get(pid)
     if not p: return False
     if p.protocol == "mqtt_ftp":
         return await bambu_publish(pid,
             {"print":{"command":"gcode_line","sequence_id":_seq(),"param":cmd}})
-    else:
+    elif p.protocol in ("moonraker", "websocket"):
         return await moonraker_gcode(pid, cmd)
+    else:
+        log.debug(f"[{p.name}] _send_printer_gcode('{cmd}') skipped — {p.protocol} has no raw-gcode API")
+        return True
 
 @app.post("/api/ottoeject/eject/{pid}")
 async def ej_eject(pid: str):
@@ -2311,8 +2424,13 @@ async def ej_eject(pid: str):
         ymax = CARTESIAN_YMAX.get(p.model, 210)
         move_cmd = f"G1 Y{ymax} F6000"
 
-    await _send_printer_gcode(pid, move_cmd)
-    await _send_printer_gcode(pid, "M400")
+    if p.protocol == "prusalink":
+        # PrusaLink has no raw-gcode API — route through the tiny-utility-print
+        # mechanism instead (see _prusa_utility_move docstring).
+        await _prusa_utility_move(pid, [move_cmd, "M400"])
+    else:
+        await _send_printer_gcode(pid, move_cmd)
+        await _send_printer_gcode(pid, "M400")
 
     # Step 3: eject via Klipper macro
     return await _run_klipper(m)
