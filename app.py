@@ -147,16 +147,16 @@ def get_load_macro(brand, model):   return _lookup(brand, model)[1]
 def has_door(brand, model):         return _lookup(brand, model)[2]
 
 def get_close_door_macro(brand, model):
-    if not has_door(brand, model):
-        return None
-    m = _norm(model)
-    b = _norm(brand)
-    if "x1c" in m or "xonec" in m:       return "CLOSE_DOOR_BAMBULAB_X_ONE_C"
-    if "x2d" in m or "xtwod" in m:       return "CLOSE_DOOR_BAMBULAB_X_TWO_D"
-    if "p1s" in m or "p2s" in m:         return "CLOSE_DOOR_BAMBULAB_P_ONE_S"
-    if "kobra" in m:                      return "CLOSE_DOOR_ANYCUBIC_KOBRA_S_ONE"
-    if "centauri" in m or "carbon" in m:  return "CLOSE_DOOR_ELEGOO_CC"
-    if "k1c" in m:                        return "CLOSE_DOOR_CREALITY_K_ONE_C"
+    """There is no standalone CLOSE_DOOR_<PRINTER> macro for any printer —
+    the generic, shared _CLOSE_DOOR is only ever called inline, from inside
+    each printer's own LOAD_ONTO_<PRINTER>/EJECT_FROM_<PRINTER> macro,
+    wherever the door genuinely needs to close as part of that sequence.
+    That's sufficient on its own: the door being left open after the very
+    last job in a queue is harmless — the next queue run's first
+    EJECT_FROM_<PRINTER> call opens it again regardless of prior state, so
+    there's nothing that actually depends on closing it standalone in
+    between. Always returns None; the "Close printer door" button
+    (frontend) already degrades gracefully when this is unavailable."""
     return None
 
 def get_open_door_macro(brand, model):
@@ -1153,6 +1153,153 @@ def _ams_mapping_from_scan(ams: dict) -> list[int]:
     while len(mapping) < 4: mapping.append(254)
     return mapping[:4]
 
+# ── .bgcode (PrusaSlicer binary G-code) ─────────────────────────────────────
+# Spec: https://github.com/prusa3d/libbgcode/blob/main/doc/specifications.md
+# File header (10B): magic "GCDE", version(u32), checksum_type(u16, 0=None/1=CRC32)
+# Then a sequence of blocks, each: header + type-specific params + data + optional checksum.
+_BGCODE_MAGIC = b"GCDE"
+_BG_BLOCK_FILE_METADATA, _BG_BLOCK_GCODE, _BG_BLOCK_SLICER_METADATA, \
+    _BG_BLOCK_PRINTER_METADATA, _BG_BLOCK_PRINT_METADATA, _BG_BLOCK_THUMBNAIL = range(6)
+
+def _bgcode_blocks(data: bytes):
+    """Yield (block_type, params: dict, payload: bytes|None) for each block.
+    payload is None when the block uses a compression we don't support
+    (Heatshrink, types 2/3) — deliberately NOT implemented here: it's a
+    proprietary embedded-systems compression algorithm with no available
+    Python library, and a from-scratch reimplementation risks subtly wrong
+    output. Getting a print's HEIGHT wrong is a physical safety issue (the
+    OTTOeject could collide with a taller-than-expected print), so we only
+    trust compression schemes we can decode with the standard library
+    (none, or Deflate via zlib) and fall back to metadata-block scanning
+    otherwise — see analyze_print_file()."""
+    if data[:4] != _BGCODE_MAGIC:
+        raise ValueError("not a .bgcode file (bad magic number)")
+    checksum_type = struct.unpack("<H", data[8:10])[0]
+    checksum_size = 4 if checksum_type == 1 else 0  # 4 bytes for CRC32
+    pos = 10
+    n = len(data)
+    while pos + 8 <= n:
+        block_type, compression = struct.unpack("<HH", data[pos:pos+4])
+        uncompressed_size = struct.unpack("<I", data[pos+4:pos+8])[0]
+        if compression == 0:
+            header_size, data_size = 8, uncompressed_size
+        else:
+            if pos + 12 > n: break
+            data_size = struct.unpack("<I", data[pos+8:pos+12])[0]
+            header_size = 12
+        p = pos + header_size
+        if block_type == _BG_BLOCK_THUMBNAIL:
+            fmt, width, height = struct.unpack("<HHH", data[p:p+6])
+            params = {"format": fmt, "width": width, "height": height}
+            p += 6
+        else:
+            params = {"encoding": struct.unpack("<H", data[p:p+2])[0]}
+            p += 2
+        raw = data[p:p+data_size]
+        if compression == 0:
+            payload = raw
+        elif compression == 1:  # Deflate
+            try: payload = zlib.decompress(raw)
+            except zlib.error:
+                try: payload = zlib.decompress(raw, -15)  # raw deflate, no zlib header
+                except zlib.error: payload = None
+        else:
+            payload = None  # Heatshrink (2/3) — unsupported, see docstring
+        p += data_size + checksum_size
+        yield block_type, params, payload
+        pos = p
+
+def _qoi_decode(data: bytes):
+    """Minimal QOI (Quite OK Image Format) decoder -> (w, h, rgba_bytes).
+    PrusaSlicer switched thumbnails from PNG to QOI by default in late 2023
+    (smaller, trivial for embedded firmware to decode) — browsers can't
+    render QOI directly, so we decode it ourselves and re-encode as PNG."""
+    if data[:4] != b"qoif":
+        raise ValueError("not a QOI image")
+    width, height = struct.unpack(">II", data[4:12])
+    pos, px_pos, run = 14, 0, 0
+    r = g = b = 0; a = 255
+    index = [(0, 0, 0, 0)] * 64
+    pixels = bytearray(width * height * 4)
+    total = width * height
+    while px_pos < total:
+        if run > 0:
+            run -= 1
+        else:
+            tag = data[pos]
+            if tag == 0xFE:
+                r, g, b = data[pos+1], data[pos+2], data[pos+3]; pos += 4
+            elif tag == 0xFF:
+                r, g, b, a = data[pos+1], data[pos+2], data[pos+3], data[pos+4]; pos += 5
+            else:
+                op = tag >> 6
+                if op == 0:
+                    r, g, b, a = index[tag & 0x3F]; pos += 1
+                elif op == 1:
+                    dr, dg, db = ((tag>>4)&3)-2, ((tag>>2)&3)-2, (tag&3)-2
+                    r, g, b = (r+dr)&0xFF, (g+dg)&0xFF, (b+db)&0xFF; pos += 1
+                elif op == 2:
+                    b2 = data[pos+1]; dg = (tag & 0x3F) - 32
+                    dr, db = dg + ((b2>>4)&0xF) - 8, dg + (b2&0xF) - 8
+                    r, g, b = (r+dr)&0xFF, (g+dg)&0xFF, (b+db)&0xFF; pos += 2
+                elif op == 3:
+                    run = tag & 0x3F; pos += 1
+            index[(r*3 + g*5 + b*7 + a*11) % 64] = (r, g, b, a)
+        pixels[px_pos*4:px_pos*4+4] = bytes((r, g, b, a))
+        px_pos += 1
+    return width, height, bytes(pixels)
+
+def _rgba_to_png(width: int, height: int, rgba: bytes) -> bytes:
+    def chunk(tag, d):
+        return struct.pack(">I", len(d)) + tag + d + struct.pack(">I", zlib.crc32(tag + d))
+    stride = width * 4
+    raw = bytearray()
+    for y in range(height):
+        raw.append(0)  # filter type: none
+        raw.extend(rgba[y*stride:(y+1)*stride])
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
+            + chunk(b"IDAT", zlib.compress(bytes(raw), 9)) + chunk(b"IEND", b""))
+
+_BG_HEIGHT_KEY_RE = re.compile(r'(?:"max_z"|max_layer_z|max_z_height)\s*[:=]\s*"?([\d.]+)', re.I)
+
+def _analyze_bgcode(data: bytes) -> dict:
+    """Best-effort height + thumbnail extraction for PrusaSlicer .bgcode files.
+    Height: scanned from Print/Slicer metadata blocks (INI/JSON text,
+    Deflate-compressed — decodable with the standard library) rather than
+    the main GCode block, which by default uses Heatshrink+MeatPack that we
+    deliberately don't decode (see _bgcode_blocks docstring). If a file was
+    exported with GCode compression disabled, we also scan that block
+    directly as a bonus. Returns {"height_mm":..., "thumbnail":...}; either
+    may be None if not found."""
+    height = None
+    thumbnail = None
+    for block_type, params, payload in _bgcode_blocks(data):
+        if payload is None:
+            continue
+        if block_type in (_BG_BLOCK_PRINT_METADATA, _BG_BLOCK_SLICER_METADATA) and height is None:
+            text = payload.decode("utf-8", errors="ignore")
+            m = _BG_HEIGHT_KEY_RE.search(text)
+            if m:
+                height = float(m.group(1))
+        elif block_type == _BG_BLOCK_GCODE and height is None:
+            # Only reachable when Compression=0 (payload wouldn't be set
+            # otherwise) — plain text, safe to scan with the normal method.
+            height = _scan_height(payload)
+        elif block_type == _BG_BLOCK_THUMBNAIL and thumbnail is None:
+            fmt = params.get("format")
+            try:
+                if fmt == 2:  # QOI
+                    w, h, rgba = _qoi_decode(payload)
+                    thumbnail = "data:image/png;base64," + base64.b64encode(_rgba_to_png(w, h, rgba)).decode()
+                elif fmt == 0:  # PNG
+                    thumbnail = "data:image/png;base64," + base64.b64encode(payload).decode()
+                elif fmt == 1:  # JPG
+                    thumbnail = "data:image/jpeg;base64," + base64.b64encode(payload).decode()
+            except Exception as e:
+                log.debug(f"bgcode thumbnail decode: {e}")
+    return {"height_mm": height, "thumbnail": thumbnail}
+
 def _extract_thumbnail(filename: str, data: bytes, gcode_data: bytes) -> Optional[str]:
     """Extract an embedded preview thumbnail as a data: URI, if present.
     - .3mf / .gcode.3mf: a PNG stored alongside the plate gcode inside the
@@ -1188,8 +1335,22 @@ def _extract_thumbnail(filename: str, data: bytes, gcode_data: bytes) -> Optiona
     return None
 
 def analyze_print_file(filename: str, data: bytes) -> dict:
-    """Analyze a .gcode, .3mf or .gcode.3mf file: print height + multi-material info."""
+    """Analyze a .gcode, .3mf, .gcode.3mf or .bgcode file: print height + multi-material info."""
     lower = filename.lower()
+
+    if lower.endswith(".bgcode"):
+        bg = _analyze_bgcode(data)
+        height = bg["height_mm"]
+        slots_needed = max(1, -(-int(height) // SLOT_GAP_MM)) if height else None
+        return {
+            "filename": filename, "height_mm": height, "slots_needed": slots_needed,
+            # .bgcode is Prusa/PrusaLink-only — no AMS-style multi-material
+            # toggle exists on that path, so these stay at their inert defaults.
+            "multi_material": False, "colours": [], "types": [], "used_slots": [],
+            "active_count": 0, "use_ams": False, "ams_mapping": [254, 254, 254, 254],
+            "thumbnail": bg["thumbnail"],
+        }
+
     gcode_data = data
     if lower.endswith(".3mf") or lower.endswith(".gcode.3mf"):
         # .3mf (and .gcode.3mf) is a ZIP archive — find the plate gcode inside
@@ -1233,8 +1394,8 @@ async def analyze_file(file: UploadFile = File(...)):
     the job actually starts (potentially much later), it does not re-upload
     from the browser."""
     name = file.filename or "upload.gcode"
-    if not (name.lower().endswith((".gcode", ".3mf")) or name.lower().endswith(".gcode.3mf")):
-        raise HTTPException(400, "Only .gcode, .3mf or .gcode.3mf supported")
+    if not (name.lower().endswith((".gcode", ".3mf", ".bgcode")) or name.lower().endswith(".gcode.3mf")):
+        raise HTTPException(400, "Only .gcode, .3mf, .gcode.3mf or .bgcode supported")
     data = await file.read()
     if len(data) > 200 * 1024 * 1024:
         raise HTTPException(413, "File too large")
