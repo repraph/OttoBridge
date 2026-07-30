@@ -775,7 +775,7 @@ async def prusa_upload(pid, local_path, remote_name):
         return r.status_code in (200, 201, 204, 409)
     except Exception as e: log.error(f"FTP prusa: {e}"); return False
 
-async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float = 60.0) -> bool:
+async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float = 60.0, source_filename: Optional[str] = None) -> bool:
     """Home/move a PrusaLink printer without a raw-gcode API by uploading a
     tiny, non-extruding gcode file and running it through PrusaLink's normal
     upload-and-print mechanism — PrusaLink has no endpoint for sending
@@ -794,7 +794,15 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
       a completed job needing to "clear" before a new one may start — if we
       returned success too early, the REAL print that follows could fail to
       start for a reason that would look identical to the bug this whole
-      mechanism exists to fix. Reports failure clearly instead of guessing."""
+      mechanism exists to fix. Reports failure clearly instead of guessing.
+
+    source_filename: the .bgcode this utility move is happening in service
+    of (e.g. the file about to be printed next) — if given, its
+    nozzle_diameter/nozzle_high_flow are read directly out of its own
+    slicer_metadata block and used for the M862.1 nozzle-compatibility
+    check below, so it always matches whatever nozzle the file was actually
+    sliced for instead of a hardcoded/guessed value that goes stale the
+    moment someone swaps nozzles."""
     p = printers.get(pid)
     if not p or p.protocol != "prusalink":
         return False
@@ -811,24 +819,24 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
     # model, AND confirmed reproducing even when starting the file directly
     # from the printer's own LCD, ruling out anything upload-side).
     # PrusaSlicer normally embeds these automatically; since we're
-    # hand-writing this utility file, we add them ourselves.
-    # F1 (not F0) below is not a generic default — it's taken directly from
-    # this printer's own real slicer profile (nozzle_high_flow=1, HF0.4
-    # nozzle variant), extracted from the .bgcode file the person uploaded
-    # earlier. The very first version of this fix used F0 and still failed
-    # with the exact same warning even printed directly from the LCD —
-    # a nozzle high-flow MISMATCH is a documented cause of this exact
-    # message on the Prusa forums, and F0 was wrong for this printer.
-    # NOTE: nozzle diameter (0.4mm) is still an assumed default — OttoBridge
-    # doesn't track that per-printer, so a printer with a different nozzle
-    # installed could still hit this warning.
-    model_check = {
-        "Core One": "COREONE", "MK4S": "MK4S", "MK4": "MK4",
-        "MK3S": "MK3S", "MK3": "MK3",
-    }.get(p.model)
-    compat_header = "M862.1 P0.4 A0 F1 ; nozzle check\nM862.5 P2 ; g-code level check\n"
-    if model_check:
-        compat_header += f'M862.3 P "{model_check}" ; printer model check\n'
+    # hand-writing this utility file, we pull every needed value directly
+    # out of the actual file about to be printed (see
+    # _prusa_compat_header_from_file) instead of guessing/hardcoding any of
+    # it — printer model, gcode level, nozzle diameter, abrasive flag, and
+    # high-flow status all come from that file's own metadata.
+    compat_header = _prusa_compat_header_from_file(source_filename) if source_filename else ""
+    if not compat_header:
+        # No source file given, file not found, or nothing could be parsed
+        # out of it (e.g. a plain .gcode job, which has none of this
+        # metadata) — fall back to only the two checks that don't depend on
+        # the installed nozzle and are the same for every job on this model.
+        model_check = {
+            "Core One": "COREONE", "MK4S": "MK4S", "MK4": "MK4",
+            "MK3S": "MK3S", "MK3": "MK3",
+        }.get(p.model)
+        compat_header = "M862.5 P2 ; g-code level check\n"
+        if model_check:
+            compat_header += f'M862.3 P "{model_check}" ; printer model check\n'
     gcode_text = compat_header + "\n".join(gcode_lines) + "\nM84\n"
     # A unique filename every call — PrusaLink's file PUT returns 409 Conflict
     # (not a harmless "already exists, treated as overwrite") when the target
@@ -838,6 +846,7 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
     # subsequent print-start 404'd because that path didn't really exist.
     remote_name = f"_ottobridge_move_{uuid.uuid4().hex[:8]}.gcode"
     tmp_path = UPLOAD_DIR / f"_ottobridge_move_{pid}_{uuid.uuid4().hex[:8]}.gcode"
+    uploaded_to_printer = False
     try:
         await asyncio.get_event_loop().run_in_executor(None, tmp_path.write_text, gcode_text)
         r_put = None
@@ -853,6 +862,14 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
         if r_put.status_code not in (200, 201, 204):
             log.error(f"[{p.name}] utility move: upload rejected (HTTP {r_put.status_code})")
             return False
+        # From here on, the file genuinely exists on the printer's storage —
+        # every exit path below (success, failure, or an unexpected
+        # exception) must clean it up via the outer finally block, or a
+        # failed utility move leaves it stranded there forever, slowly
+        # filling up the printer's storage with leftover helper files. This
+        # was confirmed to actually happen during earlier debugging of this
+        # exact function, when cleanup only ran on the full-success path.
+        uploaded_to_printer = True
 
         # Start the print: per the official PrusaLink OpenAPI spec, this is a
         # bare POST to the SAME URL used to upload the file (not a separate
@@ -902,23 +919,27 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
             cur = printers.get(pid)
             log.error(f"[{p.name}] utility move: printer did not settle back to idle afterward (status={cur.status if cur else '?'})")
             return False
-
-        # Best-effort cleanup — don't fail the whole operation if this doesn't work.
-        try:
-            async with httpx.AsyncClient(timeout=10) as c:
-                await c.delete(f"http://{p.ip}/api/v1/files/usb/{remote_name}",
-                    auth=httpx.DigestAuth("maker", p.api_key))
-        except Exception as e:
-            log.debug(f"[{p.name}] utility move: cleanup delete failed (harmless): {e}")
         return True
     except Exception as e:
         log.error(f"[{p.name}] utility move failed: {e}")
         return False
     finally:
+        # Clean up both the local scratch file AND, if it made it that far,
+        # the copy left on the printer's own storage — regardless of how
+        # this function is exiting (success, a handled failure, or an
+        # unexpected exception). See uploaded_to_printer above for why this
+        # can't just live at the end of the success path.
         try:
             await aiofiles.os.remove(tmp_path)
         except Exception:
             pass
+        if uploaded_to_printer:
+            try:
+                async with httpx.AsyncClient(timeout=10) as c:
+                    await c.delete(f"http://{p.ip}/api/v1/files/usb/{remote_name}",
+                        auth=httpx.DigestAuth("maker", p.api_key))
+            except Exception as e:
+                log.debug(f"[{p.name}] utility move: cleanup delete failed (harmless): {e}")
 
 async def moonraker_upload(pid, local_path, remote_name):
     p = printers.get(pid)
@@ -1407,6 +1428,72 @@ def _rgba_to_png(width: int, height: int, rgba: bytes) -> bytes:
             + chunk(b"IDAT", zlib.compress(bytes(raw), 9)) + chunk(b"IEND", b""))
 
 _BG_HEIGHT_KEY_RE = re.compile(r'(?:"max_z"|max_layer_z|max_z_height)\s*[:=]\s*"?([\d.]+)', re.I)
+_BG_NOZZLE_DIAM_RE = re.compile(r'^nozzle_diameter\s*=\s*([\d.]+)', re.M)
+_BG_NOZZLE_HF_RE = re.compile(r'^nozzle_high_flow\s*=\s*(\d)', re.M)
+_BG_ABRASIVE_RE = re.compile(r'^filament_abrasive\s*=\s*(\d)', re.M)
+# M862.3 (printer model) and M862.5 (gcode level) appear as fully-resolved,
+# literal text inside the embedded start_gcode template (unlike M862.1,
+# which still contains unresolved [nozzle_diameter]/{...} placeholders at
+# this point) — so these two can be copied character-for-character instead
+# of reconstructed, guaranteeing an exact match with whatever this specific
+# file was actually sliced for. The dump stores that template value with
+# literal backslash-n escapes rather than real newlines, hence [^\\\n]*
+# rather than plain '.'.
+_BG_M862_3_RE = re.compile(r'M862\.3\s+P\s*\\?"[^"\\]*\\?"\s*;\s*[^\\\n]*')
+_BG_M862_5_RE = re.compile(r'M862\.5\s+P\d+\s*;\s*[^\\\n]*')
+
+def _prusa_compat_header_from_file(filename: str) -> str:
+    """Build the M862.x gcode-compatibility header for a utility move by
+    reading every needed value directly out of the actual .bgcode file
+    about to be printed, rather than guessing or hardcoding any of it —
+    confirmed field-by-field against a real Core One .bgcode file:
+      - M862.3 (printer model) and M862.5 (gcode level): copied verbatim,
+        character-for-character, from the file's own start_gcode text
+        (these two are already fully resolved there, unlike M862.1).
+      - M862.1 (nozzle check): P/A/F values (diameter, abrasive, high-flow)
+        are plain "key=value" lines elsewhere in the same metadata and are
+        used to build this line ourselves, since the file's own copy of
+        M862.1 still contains unresolved slicer template placeholders.
+    All of the above lives in the slicer_metadata block, which — unlike the
+    main GCode block — is only Deflate-compressed (or uncompressed), never
+    Heatshrink+MeatPack, so reading it doesn't need any risky custom
+    decompression. Returns an empty string if this isn't a .bgcode file or
+    none of the above could be found (safe fallback: no false claims)."""
+    if not filename.lower().endswith(".bgcode"):
+        return ""
+    path = UPLOAD_DIR / filename
+    if not path.exists():
+        return ""
+    try:
+        data = path.read_bytes()
+        full_text = ""
+        for block_type, params, payload in _bgcode_blocks(data):
+            if payload is None or block_type not in (
+                _BG_BLOCK_SLICER_METADATA, _BG_BLOCK_PRINT_METADATA,
+                _BG_BLOCK_PRINTER_METADATA, _BG_BLOCK_FILE_METADATA,
+            ):
+                continue
+            full_text += payload.decode("utf-8", errors="ignore") + "\n"
+
+        lines = []
+        m3 = _BG_M862_3_RE.search(full_text)
+        if m3: lines.append(m3.group(0))
+        m5 = _BG_M862_5_RE.search(full_text)
+        if m5: lines.append(m5.group(0))
+
+        dm = _BG_NOZZLE_DIAM_RE.search(full_text)
+        hf = _BG_NOZZLE_HF_RE.search(full_text)
+        ab = _BG_ABRASIVE_RE.search(full_text)
+        if dm and hf:  # abrasive defaults to 0 (non-abrasive) if not found — harmless either way
+            diameter = float(dm.group(1))
+            high_flow = int(hf.group(1))
+            abrasive = int(ab.group(1)) if ab else 0
+            lines.append(f"M862.1 P{diameter} A{abrasive} F{high_flow} ; nozzle check")
+
+        return ("\n".join(lines) + "\n") if lines else ""
+    except Exception as e:
+        log.debug(f"compat header scan failed for '{filename}': {e}")
+        return ""
 
 def _analyze_bgcode(data: bytes) -> dict:
     """Best-effort height + thumbnail extraction for PrusaSlicer .bgcode files.
@@ -2034,7 +2121,7 @@ class QueueManager:
             if p and p.protocol == "prusalink":
                 # PrusaLink has no raw-gcode API — route through the tiny-utility-print
                 # mechanism instead (see _prusa_utility_move docstring).
-                ok = await _prusa_utility_move(pid, ["G28"])
+                ok = await _prusa_utility_move(pid, ["G28"], source_filename=job.get("filename"))
             else:
                 ok = await _send_printer_gcode(pid, "G28")
             return ok
@@ -2060,7 +2147,7 @@ class QueueManager:
                     return await self._grab_from_slot(job)
                 # Phase 1 (parallel): open door + move to safe pos.
                 # These two can run simultaneously — neither moves toward the plate.
-                phase1 = [self._move_to_safe_pos(pid, p)]
+                phase1 = [self._move_to_safe_pos(pid, p, job)]
                 if has_door(p.brand, p.model):
                     phase1.append(self._open_door(p))
                 results1 = await asyncio.gather(*phase1, return_exceptions=True)
@@ -2114,7 +2201,7 @@ class QueueManager:
             if step == "wait_finish":
                 return await self._wait_for_finish(pid)
             if step == "move":
-                await self._move_to_safe_pos(pid, p)
+                await self._move_to_safe_pos(pid, p, job)
                 return True
             if step == "wait_idle":
                 return await self._wait_for_idle(pid)
@@ -2137,7 +2224,7 @@ class QueueManager:
             return False
         return False
 
-    async def _move_to_safe_pos(self, pid: str, p) -> bool:
+    async def _move_to_safe_pos(self, pid: str, p, job: Optional[dict] = None) -> bool:
         if p.model in COREXY_MODELS:
             move_cmd = "G1 Z200 F3000"
         else:
@@ -2145,7 +2232,7 @@ class QueueManager:
         if p.protocol == "prusalink":
             # PrusaLink has no raw-gcode API — route through the tiny-utility-print
             # mechanism instead (see _prusa_utility_move docstring).
-            return await _prusa_utility_move(pid, [move_cmd, "M400"])
+            return await _prusa_utility_move(pid, [move_cmd, "M400"], source_filename=job.get("filename") if job else None)
         await _send_printer_gcode(pid, move_cmd)
         await _send_printer_gcode(pid, "M400")
         return True
