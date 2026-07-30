@@ -803,12 +803,28 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
         return False
 
     gcode_text = "\n".join(gcode_lines) + "\nM84\n"
-    remote_name = "_ottobridge_move.gcode"
-    tmp_path = UPLOAD_DIR / f"_ottobridge_move_{pid}.gcode"
+    # A unique filename every call — PrusaLink's file PUT returns 409 Conflict
+    # (not a harmless "already exists, treated as overwrite") when the target
+    # name is already taken, which silently broke the very first version of
+    # this function: the upload "succeeded" by our own too-lenient check, but
+    # the file on the printer was actually stale/never written, and the
+    # subsequent print-start 404'd because that path didn't really exist.
+    remote_name = f"_ottobridge_move_{uuid.uuid4().hex[:8]}.gcode"
+    tmp_path = UPLOAD_DIR / f"_ottobridge_move_{pid}_{uuid.uuid4().hex[:8]}.gcode"
     try:
         await asyncio.get_event_loop().run_in_executor(None, tmp_path.write_text, gcode_text)
-        if not await prusa_upload(pid, str(tmp_path), remote_name):
-            log.error(f"[{p.name}] utility move: upload failed")
+        r_put = None
+        try:
+            async with httpx.AsyncClient(timeout=60) as c:
+                with open(tmp_path, "rb") as f:
+                    r_put = await c.put(f"http://{p.ip}/api/v1/files/usb/{remote_name}",
+                        content=f.read(), auth=httpx.DigestAuth("maker", p.api_key),
+                        headers={"Content-Type": "application/octet-stream"})
+        except Exception as e:
+            log.error(f"[{p.name}] utility move: upload request failed: {e}")
+            return False
+        if r_put.status_code not in (200, 201, 204):
+            log.error(f"[{p.name}] utility move: upload rejected (HTTP {r_put.status_code})")
             return False
 
         async with httpx.AsyncClient(timeout=10) as c:
@@ -841,11 +857,21 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
         while time.time() < settle_deadline:
             cur = printers.get(pid)
             if cur and cur.status in ("IDLE", "READY"):
-                return True
+                break
             await asyncio.sleep(1)
-        cur = printers.get(pid)
-        log.error(f"[{p.name}] utility move: printer did not settle back to idle afterward (status={cur.status if cur else '?'})")
-        return False
+        else:
+            cur = printers.get(pid)
+            log.error(f"[{p.name}] utility move: printer did not settle back to idle afterward (status={cur.status if cur else '?'})")
+            return False
+
+        # Best-effort cleanup — don't fail the whole operation if this doesn't work.
+        try:
+            async with httpx.AsyncClient(timeout=10) as c:
+                await c.delete(f"http://{p.ip}/api/v1/files/usb/{remote_name}",
+                    auth=httpx.DigestAuth("maker", p.api_key))
+        except Exception as e:
+            log.debug(f"[{p.name}] utility move: cleanup delete failed (harmless): {e}")
+        return True
     except Exception as e:
         log.error(f"[{p.name}] utility move failed: {e}")
         return False
