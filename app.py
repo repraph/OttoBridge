@@ -6,7 +6,7 @@ Supports: Bambu Lab (X1C, X2D, P1S, P1P, A1, A1 Mini, P2S), Prusa (MK3/MK4/Core 
 Pi Zero 2 W — runs alongside Klipper + Moonraker
 """
 
-import asyncio, base64, ftplib, json, logging, os, re, ssl, struct, time, uuid, zipfile, io
+import asyncio, base64, ftplib, json, logging, os, re, ssl, struct, time, uuid, zipfile, zlib, io
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
