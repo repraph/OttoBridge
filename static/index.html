@@ -236,7 +236,7 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
   <div class="sec-title" data-i18n="files.upload">Upload</div>
   <div class="field" style="max-width:300px;margin-bottom:10px"><label data-i18n="files.transfer_to_printer">Transfer to printer</label><select id="upload-target"></select></div>
   <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
-    <input type="file" id="file-input" accept=".3mf,.gcode" onchange="uploadFile(this.files[0])">
+    <input type="file" id="file-input" accept=".3mf,.gcode,.bgcode" onchange="uploadFile(this.files[0])">
     <div style="font-size:24px;margin-bottom:7px">↑</div>
     <div data-i18n="files.drop_hint">.3mf or .gcode — transferred directly to the printer</div>
     <div style="margin-top:3px;font-size:9px;opacity:.5" data-i18n="files.click_or_drop">Click or drop a file</div>
@@ -317,7 +317,7 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
       <div class="field"><label data-i18n="jobs.printer">Printer</label><select id="job-printer" onchange="updateJobBambuOptions()"></select></div>
 
       <div class="drop-zone" id="job-dz" onclick="document.getElementById('job-gf').click()">
-        <input type="file" id="job-gf" accept=".gcode,.3mf" onchange="analyzeUpload(this.files[0])">
+        <input type="file" id="job-gf" accept=".gcode,.3mf,.bgcode" onchange="analyzeUpload(this.files[0])">
         <div style="font-size:20px;margin-bottom:4px">↑</div>
         <div data-i18n="jobs.file_types">.gcode, .3mf or .gcode.3mf</div>
         <div style="margin-top:3px;font-size:9px;opacity:.5" data-i18n="jobs.drop_hint">Drag &amp; drop or click — slots locked only when queued</div>
@@ -646,12 +646,12 @@ const I18N = {
     'toast.sync_requested':'Sync requested',
     'common.loading':'Loading…','common.select':'— select —',
     'files.upload':'Upload','files.transfer_to_printer':'Transfer to printer',
-    'files.drop_hint':'.3mf or .gcode — transferred directly to the printer','files.click_or_drop':'Click or drop a file',
+    'files.drop_hint':'.3mf, .gcode or .bgcode — transferred directly to the printer','files.click_or_drop':'Click or drop a file',
     'files.uploading':'Uploading…','files.stored_files':'Stored Files',
     'jobs.start_queue':'Start queue','jobs.queue_paused_error':'Queue paused — error in',
     'jobs.retry_from_print_start':'Retry from print start','jobs.skip_job':'Skip job','jobs.abort_free_slots':'Abort & free slots',
     'jobs.active_job':'Active Job','jobs.running':'Running','jobs.execution_steps':'Execution Steps',
-    'jobs.new_job':'New Job','jobs.printer':'Printer','jobs.file_types':'.gcode, .3mf or .gcode.3mf',
+    'jobs.new_job':'New Job','jobs.printer':'Printer','jobs.file_types':'.gcode, .3mf, .gcode.3mf or .bgcode',
     'jobs.drop_hint':'Drag & drop or click — slots locked only when queued',
     'jobs.or_pick_existing':'— or pick a stored file to reprint —',
     'jobs.bed_type':'Bed Type','jobs.bed.textured':'Textured Plate','jobs.bed.cool':'Cool Plate',
@@ -742,12 +742,12 @@ const I18N = {
     'toast.sync_requested':'Synchronisierung angefordert',
     'common.loading':'Lädt…','common.select':'— auswählen —',
     'files.upload':'Hochladen','files.transfer_to_printer':'An Drucker übertragen',
-    'files.drop_hint':'.3mf oder .gcode — wird direkt an den Drucker übertragen','files.click_or_drop':'Datei auswählen oder ablegen',
+    'files.drop_hint':'.3mf, .gcode oder .bgcode — wird direkt an den Drucker übertragen','files.click_or_drop':'Datei auswählen oder ablegen',
     'files.uploading':'Wird hochgeladen…','files.stored_files':'Gespeicherte Dateien',
     'jobs.start_queue':'Warteschlange starten','jobs.queue_paused_error':'Warteschlange pausiert — Fehler in',
     'jobs.retry_from_print_start':'Erneut ab Druckstart','jobs.skip_job':'Auftrag überspringen','jobs.abort_free_slots':'Abbrechen & Plätze freigeben',
     'jobs.active_job':'Aktiver Auftrag','jobs.running':'Läuft','jobs.execution_steps':'Ausführungsschritte',
-    'jobs.new_job':'Neuer Auftrag','jobs.printer':'Drucker','jobs.file_types':'.gcode, .3mf oder .gcode.3mf',
+    'jobs.new_job':'Neuer Auftrag','jobs.printer':'Drucker','jobs.file_types':'.gcode, .3mf, .gcode.3mf oder .bgcode',
     'jobs.drop_hint':'Ziehen & ablegen oder klicken — Plätze werden erst beim Einreihen gesperrt',
     'jobs.or_pick_existing':'— oder gespeicherte Datei zum erneuten Drucken wählen —',
     'jobs.bed_type':'Bett-Typ','jobs.bed.textured':'Strukturplatte','jobs.bed.cool':'Cool Plate',
@@ -838,12 +838,12 @@ const I18N = {
     'toast.sync_requested':'Synchronisation demandée',
     'common.loading':'Chargement…','common.select':'— sélectionner —',
     'files.upload':'Téléverser','files.transfer_to_printer':'Transférer vers l\'imprimante',
-    'files.drop_hint':'.3mf ou .gcode — transféré directement vers l\'imprimante','files.click_or_drop':'Cliquer ou déposer un fichier',
+    'files.drop_hint':'.3mf, .gcode ou .bgcode — transféré directement vers l\'imprimante','files.click_or_drop':'Cliquer ou déposer un fichier',
     'files.uploading':'Téléversement…','files.stored_files':'Fichiers enregistrés',
     'jobs.start_queue':'Démarrer la file','jobs.queue_paused_error':'File en pause — erreur dans',
     'jobs.retry_from_print_start':'Réessayer depuis le début','jobs.skip_job':'Ignorer le travail','jobs.abort_free_slots':'Annuler et libérer les emplacements',
     'jobs.active_job':'Travail actif','jobs.running':'En cours','jobs.execution_steps':'Étapes d\'exécution',
-    'jobs.new_job':'Nouveau travail','jobs.printer':'Imprimante','jobs.file_types':'.gcode, .3mf ou .gcode.3mf',
+    'jobs.new_job':'Nouveau travail','jobs.printer':'Imprimante','jobs.file_types':'.gcode, .3mf, .gcode.3mf ou .bgcode',
     'jobs.drop_hint':'Glisser-déposer ou cliquer — emplacements verrouillés seulement une fois mis en file',
     'jobs.or_pick_existing':'— ou choisir un fichier enregistré à réimprimer —',
     'jobs.bed_type':'Type de plateau','jobs.bed.textured':'Plateau texturé','jobs.bed.cool':'Plateau froid',
@@ -934,12 +934,12 @@ const I18N = {
     'toast.sync_requested':'Sincronizzazione richiesta',
     'common.loading':'Caricamento…','common.select':'— seleziona —',
     'files.upload':'Carica','files.transfer_to_printer':'Trasferisci alla stampante',
-    'files.drop_hint':'.3mf o .gcode — trasferito direttamente alla stampante','files.click_or_drop':'Clicca o trascina un file',
+    'files.drop_hint':'.3mf, .gcode o .bgcode — trasferito direttamente alla stampante','files.click_or_drop':'Clicca o trascina un file',
     'files.uploading':'Caricamento in corso…','files.stored_files':'File salvati',
     'jobs.start_queue':'Avvia coda','jobs.queue_paused_error':'Coda in pausa — errore in',
     'jobs.retry_from_print_start':'Riprova dall\'inizio stampa','jobs.skip_job':'Salta lavoro','jobs.abort_free_slots':'Annulla e libera gli slot',
     'jobs.active_job':'Lavoro attivo','jobs.running':'In esecuzione','jobs.execution_steps':'Passaggi di esecuzione',
-    'jobs.new_job':'Nuovo lavoro','jobs.printer':'Stampante','jobs.file_types':'.gcode, .3mf o .gcode.3mf',
+    'jobs.new_job':'Nuovo lavoro','jobs.printer':'Stampante','jobs.file_types':'.gcode, .3mf, .gcode.3mf o .bgcode',
     'jobs.drop_hint':'Trascina o clicca — gli slot si bloccano solo quando in coda',
     'jobs.or_pick_existing':'— oppure scegli un file salvato da ristampare —',
     'jobs.bed_type':'Tipo di piano','jobs.bed.textured':'Piano testurizzato','jobs.bed.cool':'Piano freddo',
@@ -1030,12 +1030,12 @@ const I18N = {
     'toast.sync_requested':'Sincronización solicitada',
     'common.loading':'Cargando…','common.select':'— seleccionar —',
     'files.upload':'Subir','files.transfer_to_printer':'Transferir a la impresora',
-    'files.drop_hint':'.3mf o .gcode — transferido directamente a la impresora','files.click_or_drop':'Haz clic o arrastra un archivo',
+    'files.drop_hint':'.3mf, .gcode o .bgcode — transferido directamente a la impresora','files.click_or_drop':'Haz clic o arrastra un archivo',
     'files.uploading':'Subiendo…','files.stored_files':'Archivos guardados',
     'jobs.start_queue':'Iniciar cola','jobs.queue_paused_error':'Cola pausada — error en',
     'jobs.retry_from_print_start':'Reintentar desde el inicio','jobs.skip_job':'Omitir trabajo','jobs.abort_free_slots':'Cancelar y liberar ranuras',
     'jobs.active_job':'Trabajo activo','jobs.running':'En curso','jobs.execution_steps':'Pasos de ejecución',
-    'jobs.new_job':'Nuevo trabajo','jobs.printer':'Impresora','jobs.file_types':'.gcode, .3mf o .gcode.3mf',
+    'jobs.new_job':'Nuevo trabajo','jobs.printer':'Impresora','jobs.file_types':'.gcode, .3mf, .gcode.3mf o .bgcode',
     'jobs.drop_hint':'Arrastra y suelta o haz clic — las ranuras se bloquean solo al poner en cola',
     'jobs.or_pick_existing':'— o elige un archivo guardado para reimprimir —',
     'jobs.bed_type':'Tipo de cama','jobs.bed.textured':'Placa texturizada','jobs.bed.cool':'Placa fría',
