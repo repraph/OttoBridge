@@ -837,7 +837,12 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
         compat_header = "M862.5 P2 ; g-code level check\n"
         if model_check:
             compat_header += f'M862.3 P "{model_check}" ; printer model check\n'
-    gcode_text = compat_header + "\n".join(gcode_lines) + "\nM84\n"
+    # M73 P100 R0 explicitly tells the firmware "100% done, 0 minutes
+    # remaining" — real PrusaSlicer output always includes this near the end
+    # of a print. Our hand-written file has no time/progress estimate at
+    # all otherwise, which may be why a print of this file was observed
+    # getting stuck around 93% and never completing on its own.
+    gcode_text = compat_header + "\n".join(gcode_lines) + "\nM73 P100 R0\nM84\n"
     # A unique filename every call — PrusaLink's file PUT returns 409 Conflict
     # (not a harmless "already exists, treated as overwrite") when the target
     # name is already taken, which silently broke the very first version of
@@ -898,6 +903,18 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
             await asyncio.sleep(1)
             cur = printers.get(pid)
             if not cur: return False
+            if cur.status == "PAUSED" and not seen_running:
+                # PrusaLink's "ATTENTION" state maps to our "PAUSED" — this is
+                # what the printer reports while showing a confirmation
+                # dialog on its LCD/Connect (e.g. "The G-code isn't fully
+                # compatible", but also filament-sensor or other hardware
+                # warnings) and waiting for a human to press PRINT or Abort.
+                # It will NEVER move past this on its own — failing fast with
+                # a specific message here (instead of silently waiting out
+                # the full timeout) saves time and points directly at what
+                # to check next, rather than reporting a generic timeout.
+                log.error(f"[{p.name}] utility move: printer is waiting for manual confirmation on its LCD/Connect (a dialog is blocking the print — check the printer's screen or PrusaConnect for what it's asking)")
+                return False
             if cur.status == "RUNNING":
                 seen_running = True
             elif seen_running:
