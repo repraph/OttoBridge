@@ -218,6 +218,13 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
         </div>
       </div>
     </div>
+    <div class="card" id="cam-card" style="margin-bottom:14px;display:none">
+      <div class="card-title" data-i18n="dash.camera">Camera</div>
+      <div id="cam-wrap" style="display:flex;align-items:center;justify-content:center;background:var(--bg);border-radius:3px;overflow:hidden;min-height:160px">
+        <img id="cam-img" style="max-width:100%;display:block" alt="">
+        <div id="cam-none" style="display:none;color:var(--muted);font-size:11px;padding:20px;text-align:center" data-i18n="dash.camera_unavailable">No camera available for this printer</div>
+      </div>
+    </div>
     <div class="card" id="ams-card" style="display:none;margin-bottom:14px">
       <div class="card-title">AMS</div>
       <div class="ams-grid" id="ams-trays"></div>
@@ -542,11 +549,12 @@ input:focus,select:focus{border-color:var(--acc)}select option{background:var(--
   <hr class="divider">
   <div class="sec-title" data-i18n="settings.pi_resources">Pi Zero 2 W — Resources</div>
   <div class="card">
-    <div class="kv-row"><span class="kv-key">Klipper</span><span style="color:var(--muted)">~40 MB RAM</span></div>
-    <div class="kv-row"><span class="kv-key">Moonraker</span><span style="color:var(--muted)">~60 MB RAM</span></div>
-    <div class="kv-row"><span class="kv-key">OttoBridge</span><span style="color:var(--grn)">~30 MB RAM</span></div>
-    <div class="kv-row"><span class="kv-key" data-i18n="settings.reserve">Reserve</span><span style="color:var(--grn)">~380 MB ✓</span></div>
+    <div class="kv-row"><span class="kv-key">Klipper</span><span style="color:var(--muted)">~25 MB RAM</span></div>
+    <div class="kv-row"><span class="kv-key">Moonraker</span><span style="color:var(--muted)">~55 MB RAM</span></div>
+    <div class="kv-row"><span class="kv-key">OttoBridge</span><span style="color:var(--yel)">~85 MB RAM</span></div>
+    <div class="kv-row"><span class="kv-key" data-i18n="settings.reserve">Reserve</span><span style="color:var(--yel)">~100 MB</span></div>
     <div class="kv-row"><span class="kv-key" data-i18n="settings.cpu_load_idle">CPU load (idle)</span><span style="color:var(--muted)">&lt; 5% <span data-i18n="settings.per_printer">per printer</span></span></div>
+    <div style="font-size:9px;color:var(--muted);margin-top:8px;line-height:1.5" data-i18n="settings.resources_note">Measured on a 512MB Pi Zero 2 W (~353MB usable); actual numbers vary with feature set and printer count. Live system-wide usage is shown in the footer below.</div>
   </div>
 </div>
 
@@ -581,6 +589,7 @@ const I18N = {
     'dash.status':'Status','dash.nozzle':'Nozzle','dash.bed':'Bed','dash.progress':'Progress',
     'dash.print_progress':'Print Progress','dash.resume':'Resume','dash.pause':'Pause','dash.stop':'Stop','dash.clear_error':'Clear error',
     'dash.temperatures':'Temperatures','dash.cool_down':'Cool down','dash.sync':'Sync',
+    'dash.camera':'Camera','dash.camera_unavailable':'No camera available for this printer',
     'dash.print_error':'Print error','dash.acknowledge_error':'Acknowledge error',
     'rack.title':'Rack — Slot 1 at bottom','rack.empty':'Empty','rack.blocked_hint':'Blocked (occupied by print above)',
     'rack.slots':'Slots','rack.num_slots':'Number of Slots','rack.apply':'Apply',
@@ -602,6 +611,7 @@ const I18N = {
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Move to starting position for OttoEject calibration',
     'settings.printer_home':'Printer Home',
     'settings.pi_resources':'Pi Zero 2 W — Resources','settings.reserve':'Reserve','settings.cpu_load_idle':'CPU load (idle)',
+    'settings.resources_note':'Measured on a 512MB Pi Zero 2 W (~353MB usable); actual numbers vary with feature set and printer count. Live system-wide usage is shown in the footer below.',
     'common.error':'Error',
     'confirm.cancel_print':'Cancel the current print?','confirm.remove_printer':'Remove this printer?',
     'dash.error_code':'Error code','dash.layer':'Layer','dash.min':'min','dash.no_active_print':'No active print',
@@ -677,6 +687,7 @@ const I18N = {
     'dash.status':'Status','dash.nozzle':'Düse','dash.bed':'Bett','dash.progress':'Fortschritt',
     'dash.print_progress':'Druckfortschritt','dash.resume':'Fortsetzen','dash.pause':'Pausieren','dash.stop':'Stopp','dash.clear_error':'Fehler quittieren',
     'dash.temperatures':'Temperaturen','dash.cool_down':'Abkühlen','dash.sync':'Sync',
+    'dash.camera':'Kamera','dash.camera_unavailable':'Keine Kamera für diesen Drucker verfügbar',
     'dash.print_error':'Druckfehler','dash.acknowledge_error':'Fehler quittieren',
     'rack.title':'Regal — Slot 1 unten','rack.empty':'Leer','rack.blocked_hint':'Blockiert (durch Druck darüber belegt)',
     'rack.slots':'Slots','rack.num_slots':'Anzahl Slots','rack.apply':'Übernehmen',
@@ -698,6 +709,7 @@ const I18N = {
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'In Startposition für OttoEject-Kalibrierung fahren',
     'settings.printer_home':'Drucker Home',
     'settings.pi_resources':'Pi Zero 2 W — Ressourcen','settings.reserve':'Reserve','settings.cpu_load_idle':'CPU-Last (Leerlauf)',
+    'settings.resources_note':'Gemessen auf einem Pi Zero 2 W mit 512MB (~353MB nutzbar); tatsächliche Werte variieren je nach Funktionsumfang und Anzahl Drucker. Die live Systemauslastung steht unten in der Fussleiste.',
     'common.error':'Fehler',
     'confirm.cancel_print':'Aktuellen Druck abbrechen?','confirm.remove_printer':'Diesen Drucker entfernen?',
     'dash.error_code':'Fehlercode','dash.layer':'Schicht','dash.min':'Min','dash.no_active_print':'Kein aktiver Druck',
@@ -773,6 +785,7 @@ const I18N = {
     'dash.status':'Statut','dash.nozzle':'Buse','dash.bed':'Plateau','dash.progress':'Progression',
     'dash.print_progress':'Progression de l\'impression','dash.resume':'Reprendre','dash.pause':'Pause','dash.stop':'Arrêter','dash.clear_error':'Effacer l\'erreur',
     'dash.temperatures':'Températures','dash.cool_down':'Refroidir','dash.sync':'Sync',
+    'dash.camera':'Caméra','dash.camera_unavailable':'Aucune caméra disponible pour cette imprimante',
     'dash.print_error':'Erreur d\'impression','dash.acknowledge_error':'Confirmer l\'erreur',
     'rack.title':'Étagère — emplacement 1 en bas','rack.empty':'Vide','rack.blocked_hint':'Bloqué (occupé par une impression au-dessus)',
     'rack.slots':'Emplacements','rack.num_slots':'Nombre d\'emplacements','rack.apply':'Appliquer',
@@ -794,6 +807,7 @@ const I18N = {
     'settings.ottoeject_home':'Origine OttoEject','settings.move_to_calib_pos':'Aller à la position de départ pour le calibrage d\'OttoEject',
     'settings.printer_home':'Origine imprimante',
     'settings.pi_resources':'Pi Zero 2 W — Ressources','settings.reserve':'Réserve','settings.cpu_load_idle':'Charge CPU (inactif)',
+    'settings.resources_note':'Mesuré sur un Pi Zero 2 W avec 512 Mo (~353 Mo utilisables) ; les valeurs réelles varient selon les fonctionnalités et le nombre d\'imprimantes. L\'utilisation système en direct est affichée dans le pied de page ci-dessous.',
     'common.error':'Erreur',
     'confirm.cancel_print':'Annuler l\'impression en cours ?','confirm.remove_printer':'Supprimer cette imprimante ?',
     'dash.error_code':'Code d\'erreur','dash.layer':'Couche','dash.min':'min','dash.no_active_print':'Aucune impression active',
@@ -869,6 +883,7 @@ const I18N = {
     'dash.status':'Stato','dash.nozzle':'Ugello','dash.bed':'Piano','dash.progress':'Avanzamento',
     'dash.print_progress':'Avanzamento stampa','dash.resume':'Riprendi','dash.pause':'Pausa','dash.stop':'Stop','dash.clear_error':'Cancella errore',
     'dash.temperatures':'Temperature','dash.cool_down':'Raffredda','dash.sync':'Sync',
+    'dash.camera':'Fotocamera','dash.camera_unavailable':'Nessuna fotocamera disponibile per questa stampante',
     'dash.print_error':'Errore di stampa','dash.acknowledge_error':'Conferma errore',
     'rack.title':'Rastrelliera — Slot 1 in basso','rack.empty':'Vuoto','rack.blocked_hint':'Bloccato (occupato da una stampa sopra)',
     'rack.slots':'Slot','rack.num_slots':'Numero di slot','rack.apply':'Applica',
@@ -890,6 +905,7 @@ const I18N = {
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Vai alla posizione iniziale per la calibrazione di OttoEject',
     'settings.printer_home':'Home stampante',
     'settings.pi_resources':'Pi Zero 2 W — Risorse','settings.reserve':'Riserva','settings.cpu_load_idle':'Carico CPU (inattivo)',
+    'settings.resources_note':'Misurato su un Pi Zero 2 W con 512MB (~353MB utilizzabili); i valori reali variano in base alle funzionalità e al numero di stampanti. L\'utilizzo di sistema in tempo reale è mostrato nel piè di pagina qui sotto.',
     'common.error':'Errore',
     'confirm.cancel_print':'Annullare la stampa in corso?','confirm.remove_printer':'Rimuovere questa stampante?',
     'dash.error_code':'Codice errore','dash.layer':'Strato','dash.min':'min','dash.no_active_print':'Nessuna stampa attiva',
@@ -965,6 +981,7 @@ const I18N = {
     'dash.status':'Estado','dash.nozzle':'Boquilla','dash.bed':'Cama','dash.progress':'Progreso',
     'dash.print_progress':'Progreso de impresión','dash.resume':'Reanudar','dash.pause':'Pausar','dash.stop':'Detener','dash.clear_error':'Borrar error',
     'dash.temperatures':'Temperaturas','dash.cool_down':'Enfriar','dash.sync':'Sync',
+    'dash.camera':'Cámara','dash.camera_unavailable':'No hay cámara disponible para esta impresora',
     'dash.print_error':'Error de impresión','dash.acknowledge_error':'Confirmar error',
     'rack.title':'Estante — ranura 1 abajo','rack.empty':'Vacío','rack.blocked_hint':'Bloqueado (ocupado por una impresión arriba)',
     'rack.slots':'Ranuras','rack.num_slots':'Número de ranuras','rack.apply':'Aplicar',
@@ -986,6 +1003,7 @@ const I18N = {
     'settings.ottoeject_home':'OttoEject Home','settings.move_to_calib_pos':'Ir a la posición inicial para la calibración de OttoEject',
     'settings.printer_home':'Origen impresora',
     'settings.pi_resources':'Pi Zero 2 W — Recursos','settings.reserve':'Reserva','settings.cpu_load_idle':'Carga de CPU (inactivo)',
+    'settings.resources_note':'Medido en un Pi Zero 2 W con 512MB (~353MB utilizables); los valores reales varían según las funciones y el número de impresoras. El uso del sistema en vivo se muestra en el pie de página de abajo.',
     'common.error':'Error',
     'confirm.cancel_print':'¿Cancelar la impresión actual?','confirm.remove_printer':'¿Eliminar esta impresora?',
     'dash.error_code':'Código de error','dash.layer':'Capa','dash.min':'min','dash.no_active_print':'Sin impresión activa',
@@ -1272,6 +1290,37 @@ function renderDash(){
       return `<div class="tray"><div class="tray-color" style="background:${col}"></div><div>${esc(t.tray_type||'—')}</div><div>${t.remain!=null?t.remain+'%':''}</div></div>`;
     })).join('');
   }else ac.style.display='none';
+  updateDashCamera(p);
+}
+
+let camRefreshTimer=null;
+let camLastPid=null;
+function updateDashCamera(p){
+  const card=document.getElementById('cam-card');
+  const img=document.getElementById('cam-img');
+  const none=document.getElementById('cam-none');
+  card.style.display='block';
+  if(!p.camera_url){
+    img.style.display='none'; none.style.display='block';
+    if(camRefreshTimer){clearInterval(camRefreshTimer);camRefreshTimer=null;}
+    camLastPid=null;
+    return;
+  }
+  none.style.display='none'; img.style.display='block';
+  if(camLastPid===dashPid)return;  // already showing this printer's camera — don't reset an active stream
+  camLastPid=dashPid;
+  if(camRefreshTimer){clearInterval(camRefreshTimer);camRefreshTimer=null;}
+  if(p.camera_url.startsWith('/api/camera/')){
+    // Single-shot snapshot endpoint (PrusaLink) — needs periodic re-fetching
+    // to approximate a live view; direct MJPEG stream URLs below don't.
+    const refresh=()=>{img.src=p.camera_url+'?t='+Date.now();};
+    refresh();
+    camRefreshTimer=setInterval(refresh,3000);
+  }else{
+    // Direct stream URL (Elegoo MJPEG, Klipper webcam) — the browser opens
+    // and holds this connection itself; OttoBridge never sees the video.
+    img.src=p.camera_url;
+  }
 }
 
 function setDot(on,lbl){
