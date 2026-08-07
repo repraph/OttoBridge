@@ -16,7 +16,7 @@ import aiofiles, aiofiles.os
 import httpx
 import websockets
 from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -185,7 +185,6 @@ class PrinterState:
         self.remaining_min = None; self.filename = ""; self.layer_num = None
         self.total_layer_num = None; self.ams = {}; self.print_error = "0"
         self.subtask_id = "0"; self._mqtt = None; self._ws = None
-        self.camera_url = None  # resolved lazily per protocol, see _resolve_camera_url()
 
     @property
     def protocol(self): return BRANDS.get(self.brand, {}).get("protocol", "unknown")
@@ -210,7 +209,6 @@ class PrinterState:
             "last_seen": self.last_seen,
             "macros": {"eject": e, "load": l, "close_door": d},
             "has_door": d is not None,
-            "camera_url": self.camera_url,
         }
 
 # ── Rack state ─────────────────────────────────────────────────────────────────
@@ -687,56 +685,6 @@ async def start_printer_task(pid: str):
     fn = loop_map.get(p.protocol)
     if fn: mqtt_tasks[pid] = asyncio.create_task(fn(pid))
     else: log.warning(f"Unknown protocol {p.protocol}")
-    asyncio.create_task(_resolve_camera_url(pid))
-
-async def _resolve_camera_url(pid: str):
-    """Figure out (once, at connect time) how this printer's own camera can
-    be embedded directly in the dashboard — reusing whatever camera
-    infrastructure the printer/its firmware already provides, rather than
-    OttoBridge running its own video pipeline (which would cost real CPU/RAM
-    on a Pi Zero 2 W). Sets p.camera_url to one of:
-      - a direct http(s) URL the BROWSER can load itself (Elegoo, and
-        Klipper-based printers with a configured Moonraker webcam) — video
-        bytes never pass through OttoBridge at all.
-      - "/api/camera/<pid>/snapshot" — our own lightweight proxy endpoint,
-        for protocols (PrusaLink) whose camera API needs authentication a
-        plain <img> tag can't provide.
-      - None if this printer's protocol has no viable low-cost option:
-        - Bambu (mqtt_ftp): camera is only exposed via RTSPS on port 322,
-          which no browser can play natively — every known way to view it
-          (Home Assistant + go2rtc, MediaMTX, ffmpeg) needs a real
-          transcoding pipeline, which is a genuinely heavy addition we're
-          deliberately not taking on just for a camera preview.
-        - FlashForge (http_tcp): no documented camera API found."""
-    p = printers.get(pid)
-    if not p: return
-    try:
-        if p.protocol == "sdcp_ws":
-            # Elegoo: fixed, documented convention (OpenCentauri project) —
-            # plain HTTP MJPEG, no auth, embeddable directly.
-            p.camera_url = f"http://{p.ip}:3031/video"
-        elif p.protocol == "prusalink":
-            # PrusaLink's /api/v1/cameras/snap needs Digest auth, which a
-            # plain <img> tag can't provide — proxied through our own
-            # endpoint instead (see /api/camera/{pid}/snapshot below).
-            p.camera_url = f"/api/camera/{pid}/snapshot"
-        elif p.protocol in ("moonraker", "websocket"):
-            # Klipper-based (Creality, Anycubic+Rinkhals, generic) — ask
-            # Moonraker what webcam(s) are configured (Mainsail/Fluidd/
-            # crowsnest convention) rather than guessing a port/path.
-            async with httpx.AsyncClient(timeout=5) as c:
-                r = await c.get(f"http://{p.ip}:7125/server/webcams/list")
-            if r.status_code == 200:
-                cams = r.json().get("result", {}).get("webcams", [])
-                enabled = [c for c in cams if c.get("enabled", True)]
-                if enabled:
-                    url = enabled[0].get("stream_url") or enabled[0].get("snapshot_url")
-                    if url and url.startswith("/"):
-                        url = f"http://{p.ip}{url}"  # relative path -> same host as Moonraker
-                    p.camera_url = url
-        # mqtt_ftp (Bambu) and http_tcp (FlashForge): no viable option, leave as None.
-    except Exception as e:
-        log.debug(f"[{p.name}] camera URL resolution failed: {e}")
 
 # ── FTP (Bambu) ────────────────────────────────────────────────────────────────
 class ImplicitFTP_TLS(ftplib.FTP_TLS):
@@ -876,7 +824,7 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
     p = printers.get(pid)
     if not p or p.protocol != "prusalink":
         return False
-    if p.status not in ("IDLE", "READY", "", "UNKNOWN"):
+    if p.status not in ("IDLE", "READY", "FINISH", "", "UNKNOWN"):
         log.error(f"[{p.name}] utility move refused — printer not idle (status={p.status})")
         return False
 
@@ -995,11 +943,20 @@ async def _prusa_utility_move(pid: str, gcode_lines: list[str], timeout_s: float
 
         # Settle check: confirm the printer is genuinely ready for what comes
         # next (either the real print, or another queue step) before we
-        # claim success.
+        # claim success. FINISH counts as settled too — confirmed directly:
+        # PrusaLink leaves a completed job at "FINISHED" (our "FINISH")
+        # rather than automatically returning to IDLE/READY on its own, even
+        # for our own trivial non-extruding utility move. That's normal
+        # PrusaLink behavior, not a stuck/failed state — a fresh upload+print
+        # right after still works fine — so treating it as "not settled"
+        # here was a real bug: it made every queue-start homing attempt
+        # falsely report failure and abort before OTTOeject ever got to
+        # open the door / grab / load, even though the physical homing had
+        # already completed successfully.
         settle_deadline = time.time() + 15
         while time.time() < settle_deadline:
             cur = printers.get(pid)
-            if cur and cur.status in ("IDLE", "READY"):
+            if cur and cur.status in ("IDLE", "READY", "FINISH"):
                 break
             await asyncio.sleep(1)
         else:
@@ -2771,30 +2728,6 @@ async def klipper_status():
     except Exception as e: return {"error": str(e)}
 
 # ── WebSocket ──────────────────────────────────────────────────────────────────
-@app.get("/api/camera/{pid}/snapshot")
-async def camera_snapshot(pid: str):
-    """Proxy for PrusaLink's /api/v1/cameras/snap — that endpoint needs HTTP
-    Digest auth, which a plain <img> tag in the browser has no way to
-    supply, so we fetch it here (server-side, where we already have the
-    printer's api_key) and hand back just the image bytes. The frontend
-    re-requests this every few seconds to approximate a live view; only a
-    single small JPEG/PNG passes through OttoBridge at a time, never a
-    continuous stream, so this stays cheap even on a Pi Zero 2 W."""
-    p = printers.get(pid)
-    if not p or p.protocol != "prusalink":
-        raise HTTPException(404)
-    try:
-        async with httpx.AsyncClient(timeout=10) as c:
-            r = await c.get(f"http://{p.ip}/api/v1/cameras/snap",
-                auth=httpx.DigestAuth("maker", p.api_key))
-        if r.status_code != 200:
-            raise HTTPException(502, f"camera snapshot HTTP {r.status_code}")
-        return Response(content=r.content, media_type=r.headers.get("content-type", "image/png"))
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(502, f"camera snapshot failed: {e}")
-
 @app.websocket("/ws")
 async def ws_ep(ws: WebSocket):
     await ws.accept(); ws_clients.append(ws)
